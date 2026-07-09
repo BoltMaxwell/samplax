@@ -1,0 +1,30 @@
+[project]
+name = "samplax"
+version = "0.1.0"
+description = "A curated SG-MCMC sampler library in pure JAX, with kernels vendored from verified ports of the original papers' code"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jax>=0.4.30",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7",
+    "furo",
+    "myst-parser",
+]
+dev = [
+    "pytest>=7",
+    # not a samplax dependency: needed only to import the sibling source
+    # repos (csgmcmc-jax etc.) in tests/test_vendored_equivalence.py
+    "blackjax>=1.2",
+]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["samplax*"]
