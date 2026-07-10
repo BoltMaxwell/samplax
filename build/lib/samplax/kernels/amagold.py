@@ -52,11 +52,11 @@ def amagold(u_fn, grad_u, *, dt, nstep, C, mh=True):
             grad_x = grad_u(k_grad, x)
             p = ((1.0 - dt * beta) * p - grad_x * dt
                  + jax.random.normal(k_noise) * sigma) / (1.0 + dt * beta)
-            rho = rho + jnp.sum(grad_x * (p + p_old)) * dt / 2.0
+            rho = rho + grad_x * (p + p_old) * dt / 2.0
             return (x, p, rho), None
 
         (x, p, rho), _ = jax.lax.scan(
-            leapfrog, (x, p, jnp.zeros(())),
+            leapfrog, (x, p, jnp.zeros_like(old_energy)),
             (jnp.arange(nstep), jax.random.split(key_steps, nstep)))
         x = x + p * dt / 2.0
 
