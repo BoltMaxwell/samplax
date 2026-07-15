@@ -125,8 +125,8 @@ def test_run_sgmcmc_family_b_seam():
     d_w, d_theta, d_x0 = 3, 2, 1
     obs = jnp.asarray([0.5, -0.3, 0.8])
 
-    def log_likelihood_fn(w, theta):
-        return -0.5 * jnp.sum((w - obs) ** 2) / 0.1**2
+    def log_likelihood_fn(w, theta, x0):
+        return -0.5 * jnp.sum((w - obs) ** 2) / 0.1**2 + 0.0 * jnp.sum(theta) + 0.0 * jnp.sum(x0)
 
     def energy_fn(w, theta, x0):
         return 0.5 * jnp.sum(w**2) + 0.5 * jnp.sum(theta**2) + 0.5 * jnp.sum(x0**2)
