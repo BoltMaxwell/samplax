@@ -175,7 +175,8 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
     z0 = init_mean[None, :] + cfg.init_std * jax.random.normal(key_init, (cfg.chains, d_z))
     states = jax.vmap(lambda z: kernel.init(key_init, z))(z0)
     if correction is not None:
-        cstates = jax.vmap(lambda z: correction.init(key_cinit, z))(z0)
+        cinit_keys = jax.random.split(key_cinit, cfg.chains)
+        cstates = jax.vmap(correction.init)(cinit_keys, z0)
     else:
         cstates = ()
 
@@ -186,13 +187,14 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
 
         def chain_step(key, state, cstate):
             pos_old = state.position
+            g = grad_fn(pos_old)
             if correction is not None:
                 k_corr, k_step = jax.random.split(key)
                 g_corr, cstate = correction.step(k_corr, pos_old, cstate)
-                g = _sanitize_grad(grad_fn(pos_old), cfg.grad_clip) + g_corr
+                g = g + g_corr
             else:
                 k_step = key
-                g = _sanitize_grad(grad_fn(pos_old), cfg.grad_clip)
+            g = _sanitize_grad(g, cfg.grad_clip)
             temp = cfg.temperature * jnp.where(sched.do_sample, 1.0, 0.0)
             state = kernel.step(k_step, state, g, sched.step_size, temp)
             # Sanitize the position only: momentum / preconditioner accumulator

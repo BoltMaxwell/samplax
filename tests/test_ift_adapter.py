@@ -169,3 +169,82 @@ def test_correction_state_threads():
     counts = np.asarray(res.final_state["correction"])
     assert counts.shape == (cfg.chains,)
     assert np.all(counts == iterations)
+
+
+def test_nan_correction_is_sanitized():
+    """NaN in correction gradient is sanitized (becomes 0) and chain still moves.
+
+    Tests that the combined gradient (main + correction) is sanitized as a unit.
+    A correction returning NaN should not latch the chain onto NaN positions.
+    """
+    d_w, d_theta, d_x0 = 1, 1, 1
+
+    def log_likelihood_fn(w, theta, x0):
+        return -0.5 * jnp.sum((jnp.concatenate([w, theta, x0])) ** 2)
+
+    def energy_fn(w, theta, x0):
+        return 0.0
+
+    def c_init(key, z0):
+        return ()
+
+    def c_step(key, z, c):
+        # Return NaN gradient; should be sanitized to 0.0
+        return jnp.full_like(z, jnp.nan), c
+
+    correction = ift_sde.Correction(init=c_init, step=c_step)
+
+    cfg = ift_sde.SGMCMCConfig(
+        kernel="sgld", schedule="constant", step_size=1e-3,
+        theta_prior_std=1.0, x0_prior_std=1.0,
+        iterations=5000, burn_in=500, thinning=10, chains=4,
+        grad_clip=1e3, state_clip=1e6,
+    )
+    res = ift_sde.run_sgmcmc(jax.random.key(4), d_w=d_w, d_theta=d_theta,
+                             d_x0=d_x0, log_likelihood_fn=log_likelihood_fn,
+                             energy_fn=energy_fn, config=cfg, correction=correction)
+
+    # All samples must be finite
+    assert np.all(np.isfinite(res.samples["z_samples"]))
+
+    # Chain must have moved: std of kept positions should be > 0.01
+    z_kept = res.samples["z_samples"].reshape(-1)
+    assert float(np.std(z_kept)) > 0.01
+
+
+def test_correction_init_keys_per_chain():
+    """Each chain gets its own init key for the correction.
+
+    Tests that correction.init is called with different keys per chain,
+    not the same key broadcast across all chains.
+    """
+    d_w, d_theta, d_x0 = 1, 0, 0
+
+    def log_likelihood_fn(w, theta, x0):
+        return 0.0 * jnp.sum(w)
+
+    def energy_fn(w, theta, x0):
+        return 0.0
+
+    def c_init(key, z0):
+        # Return a sample from the key; different keys -> different values
+        return jax.random.normal(key, ())
+
+    def c_step(key, z, c):
+        return jnp.zeros_like(z), c
+
+    correction = ift_sde.Correction(init=c_init, step=c_step)
+
+    cfg = ift_sde.SGMCMCConfig(
+        kernel="sgld", schedule="constant", step_size=1e-4,
+        iterations=10, burn_in=0, thinning=10, chains=4,
+    )
+    res = ift_sde.run_sgmcmc(jax.random.key(5), d_w=d_w, d_theta=d_theta,
+                             d_x0=d_x0, log_likelihood_fn=log_likelihood_fn,
+                             energy_fn=energy_fn, config=cfg, correction=correction)
+
+    cstates = np.asarray(res.final_state["correction"])
+    assert cstates.shape == (cfg.chains,)
+    # If all chains got the same key, they would all have the same init value.
+    # With per-chain keys, they should differ (very unlikely to all be equal).
+    assert not np.allclose(cstates, cstates[0])
