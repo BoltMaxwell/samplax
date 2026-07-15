@@ -285,3 +285,50 @@ def test_iterations_must_divide_by_thinning():
     with pytest.raises(ValueError, match="divisible by thinning"):
         ift_sde.run_sgmcmc(jax.random.key(0), d_w=1, d_theta=1, d_x0=1,
                            log_likelihood_fn=loglik, energy_fn=energy, config=cfg)
+
+
+def test_cyclical_masks_exploration_phase_chunk_ends():
+    """A cyclical schedule zeroes the temperature during its exploration
+    phase, so a chunk-end that lands there is an optimization iterate, not a
+    posterior draw, and must not be kept. Compute the expected kept count
+    directly from samplax's own cyclical schedule function (not duplicated
+    phase math) and compare against what run_sgmcmc actually kept; also
+    check that a constant-schedule run (always do_sample=True) is unaffected
+    and keeps the full count."""
+    from samplax.schedules import cyclical as cyclical_schedule
+
+    def loglik(w, theta, x0):
+        return -0.5 * jnp.sum(w**2) + 0.0 * theta.sum() + 0.0 * x0.sum()
+
+    def energy(w, theta, x0):
+        return jnp.asarray(0.0) * jnp.sum(w)
+
+    iterations, thinning, burn_in = 400, 10, 0
+    num_cycles, exploration_ratio, step_size = 2, 0.5, 1e-3
+    cyc_cfg = ift_sde.SGMCMCConfig(
+        kernel="sgld", schedule="cyclical", step_size=step_size,
+        iterations=iterations, thinning=thinning, burn_in=burn_in,
+        num_cycles=num_cycles, exploration_ratio=exploration_ratio, chains=2,
+    )
+    cyc_res = ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
+                                 log_likelihood_fn=loglik, energy_fn=energy, config=cyc_cfg)
+
+    sched_fn = cyclical_schedule(iterations, num_cycles, step_size, exploration_ratio)
+    n_chunks = iterations // thinning
+    expected_kept = sum(
+        1 for c in range(n_chunks)
+        if (c + 1) * thinning > burn_in
+        and bool(sched_fn((c + 1) * thinning - 1).do_sample)
+    )
+    # sanity: the exploration phases really do drop chunk-ends here, else the
+    # test wouldn't distinguish the fix from the old (unconditional-keep) behavior
+    assert expected_kept < n_chunks
+    assert cyc_res.samples["z_samples"].shape[1] == expected_kept
+
+    const_cfg = ift_sde.SGMCMCConfig(
+        kernel="sgld", schedule="constant", step_size=step_size,
+        iterations=iterations, thinning=thinning, burn_in=burn_in, chains=2,
+    )
+    const_res = ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
+                                   log_likelihood_fn=loglik, energy_fn=energy, config=const_cfg)
+    assert const_res.samples["z_samples"].shape[1] == n_chunks

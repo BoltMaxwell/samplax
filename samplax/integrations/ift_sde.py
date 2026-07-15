@@ -35,7 +35,13 @@ Sampler configuration (:class:`SGMCMCConfig`) mirrors ift-sde's engines:
 ``init_mean`` (default zeros) offsets the chain-init Gaussian, ``schedule``
 adds ``"exponential"`` (geometric interpolation to ``step_size_final``,
 matching ift-sde's NPSGLD decay) alongside ``"constant"``/``"cyclical"``/
-``"polynomial"``, and gradients/positions are sanitized exactly as
+``"polynomial"``. Post-burn-in chunk-ends are kept as samples only when the
+schedule marks that chunk's final step as a sampling step (``do_sample``);
+for ``"cyclical"`` this means chunk-ends that fall in an exploration phase
+(temperature zeroed) are dropped, so a cyclical run keeps strictly fewer
+than ``(iterations - burn_in) // thinning`` samples -- the other schedules
+are always ``do_sample=True`` and keep the full count. Gradients/positions
+are sanitized exactly as
 ``methods/npsgld/npsgld.py`` does: gradients are NaN-to-zero'd and clipped
 elementwise to ``grad_clip`` before the kernel step; the post-step position
 is reverted to its pre-step value wherever it turned non-finite and then
@@ -233,7 +239,14 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
         keys = jax.random.split(sub, (cfg.thinning, cfg.chains))
         (states, cstates, t), lps = run_chunk(states, cstates, t, keys)
         step_now = (c + 1) * cfg.thinning
-        if step_now > cfg.burn_in:
+        # A cyclical schedule zeroes the temperature during its exploration
+        # phase, so chunk-ends that land there are optimization iterates, not
+        # posterior draws -- only keep a chunk when the schedule marks its
+        # final step (0-indexed step_now - 1) as a sampling step. Constant /
+        # exponential / polynomial schedules are always do_sample=True, so
+        # this is a no-op for them.
+        do_sample_final = bool(schedule(step_now - 1).do_sample)
+        if step_now > cfg.burn_in and do_sample_final:
             kept.append(np.asarray(states.position))
         if step_now % cfg.trace_every == 0 or c == n_chunks - 1:
             trace_t.append(step_now)
