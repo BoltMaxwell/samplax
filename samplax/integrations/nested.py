@@ -54,7 +54,7 @@ against samplax's ``Kernel`` / ``Correction`` protocols, not a vendored
 kernel port.
 """
 
-from typing import Callable, NamedTuple, Optional
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -87,6 +87,17 @@ def _sanitize_grad(g, clip):
     return jnp.clip(jnp.nan_to_num(g, nan=0.0, posinf=clip, neginf=-clip), -clip, clip)
 
 
+def _sanitize_state(candidate, old, clip):
+    """State-level sanitization of a kernel position, mirroring ift-sde's
+    ``npsgld.py::_sanitize_state``: any non-finite coordinate of ``candidate``
+    falls back to the corresponding coordinate of ``old``, and the result is
+    clipped to ``[-clip, clip]``. Applied to the aux position after every aux
+    kernel step so a transient NaN/inf gradient or proposal cannot
+    permanently poison the persistent chain (which would otherwise carry a
+    NaN position forward forever, since PCD never reinitializes it)."""
+    return jnp.clip(jnp.where(jnp.isfinite(candidate), candidate, old), -clip, clip)
+
+
 def nested_correction(
     energy_fn,
     d_w,
@@ -100,6 +111,7 @@ def nested_correction(
     grad_clip=1e3,
     rewarm_threshold=None,
     rewarm_iterations=0,
+    state_clip: float = 1.0e6,
 ) -> Correction:
     """Build a persistent-PCD-style :class:`~samplax.integrations.ift_sde.Correction`.
 
@@ -119,7 +131,14 @@ def nested_correction(
     (``-grad_w energy``) elementwise, matching npsgld's
     ``grad_conditional_path``; the returned correction gradient itself is
     left unsanitized here (``run_sgmcmc`` sanitizes the combined drift as a
-    unit after adding it to the main gradient).
+    unit after adding it to the main gradient). ``state_clip`` sanitizes the
+    aux chain's *position* after every aux kernel step (main loop and
+    re-warm loop alike), matching npsgld's ``_sanitize_state``: any
+    non-finite proposal coordinate falls back to the previous position and
+    the result is clipped to ``[-state_clip, state_clip]``. Because the aux
+    chain is persistent (never reinitialized across outer steps), a single
+    un-sanitized NaN position would otherwise poison it forever; this keeps
+    a transient NaN gradient or proposal from doing that.
     """
 
     kern = kernel if kernel is not None else sgld(preconditioner=rmsprop())
@@ -146,7 +165,9 @@ def nested_correction(
 
         def aux_kernel_step(k, s):
             g = _aux_grad(s.position, params)
-            return kern.step(k, s, g, step_size, 1.0)
+            s_new = kern.step(k, s, g, step_size, 1.0)
+            w_new = _sanitize_state(s_new.position, s.position, state_clip)
+            return s_new._replace(position=w_new)
 
         if rewarm_threshold is not None:
             delta = params - prev_params
