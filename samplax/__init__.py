@@ -21,7 +21,7 @@ from .kernels.hmc import hmc
 from .kernels.sghmc import SGHMCState, sghmc
 from .kernels.sgld import SGLDState, sgld
 from .preconditioners import Preconditioner, identity, rmsprop
-from .schedules import ScheduleState, constant, cyclical, polynomial
+from .schedules import ScheduleState, constant, cyclical, exponential, polynomial
 from .transforms import quant, vc
 from .transforms.lp_sgld import LPKernel, lp_sgld
 
@@ -33,6 +33,6 @@ __all__ = [
     "hmc", "amagold", "amagold_minibatch",
     "lp_sgld", "LPKernel", "quant", "vc",
     "Preconditioner", "identity", "rmsprop",
-    "schedules", "ScheduleState", "constant", "cyclical", "polynomial",
+    "schedules", "ScheduleState", "constant", "cyclical", "exponential", "polynomial",
     "gibbs_precision",
 ]
