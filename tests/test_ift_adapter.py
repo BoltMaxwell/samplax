@@ -207,9 +207,11 @@ def test_nan_correction_is_sanitized():
     # All samples must be finite
     assert np.all(np.isfinite(res.samples["z_samples"]))
 
-    # Chain must have moved: std of kept positions should be > 0.01
-    z_kept = res.samples["z_samples"].reshape(-1)
-    assert float(np.std(z_kept)) > 0.01
+    # Chain must have MOVED over time: per-chain temporal std (axis=1 is the
+    # kept-sample axis). Cross-chain init spread is nonzero even for frozen
+    # chains (init_std > 0), so a pooled std would not catch a freeze.
+    z_kept = res.samples["z_samples"]  # (chains, kept, d)
+    assert float(np.std(z_kept, axis=1).min()) > 0.01
 
 
 def test_correction_init_keys_per_chain():
