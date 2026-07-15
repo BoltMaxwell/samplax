@@ -271,3 +271,17 @@ def test_rmsprop_hyperparams_configurable():
         bad = ift_sde.SGMCMCConfig(preconditioner="dense_fisher")
         ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
                    log_likelihood_fn=loglik, energy_fn=energy, config=bad)
+
+
+def test_iterations_must_divide_by_thinning():
+    """Non-divisible iterations/thinning would silently drop remainder steps."""
+    def loglik(w, theta, x0):
+        return 0.0 * jnp.sum(w)
+
+    def energy(w, theta, x0):
+        return 0.0
+
+    cfg = ift_sde.SGMCMCConfig(iterations=23, thinning=5, burn_in=0, chains=2)
+    with pytest.raises(ValueError, match="divisible by thinning"):
+        ift_sde.run_sgmcmc(jax.random.key(0), d_w=1, d_theta=1, d_x0=1,
+                           log_likelihood_fn=loglik, energy_fn=energy, config=cfg)

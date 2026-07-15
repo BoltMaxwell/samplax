@@ -138,6 +138,12 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
                log_prior_fn: Optional[Callable] = None,
                correction: Optional[Correction] = None) -> SGMCMCResult:
     cfg = config or SGMCMCConfig()
+    if cfg.iterations % cfg.thinning != 0:
+        raise ValueError(
+            f"iterations ({cfg.iterations}) must be divisible by thinning "
+            f"({cfg.thinning}): the chunked scan would silently drop the "
+            f"remainder steps (and an exponential schedule would never reach "
+            f"step_size_final)")
     d_z = d_w + d_theta + d_x0
 
     if cfg.schedule == "exponential" and cfg.step_size_final is None:
