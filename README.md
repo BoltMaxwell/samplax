@@ -18,6 +18,11 @@ This is a personal, curated sampling book — provenance over coverage.
 | low-precision SGLD (F / naive / VC) | low-precision-sgld-jax | Zhang, Wilson, De Sa 2022 |
 | Gibbs Gamma hyperpriors | SGHMC-jax (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
 
+Integrations
+------------
+
+The `samplax.integrations` package holds adapter and composition code of ift-sde origin, not vendored-kernel provenance classes. Currently: `ift_sde` (engine adapter for the ift-sde `run_sgmcmc` sampler seam, with a stateful `Correction` protocol); `nested` (persistent-PCD ∇log Z correction with optional re-warm policy, Tieleman 2008 framing).
+
 How this differs from [jax-sgmc](https://github.com/tummfm/jax-sgmc) /
 [sgmcmcjax](https://github.com/jeremiecoullon/SGMCMCJax): samplax is **not a
 framework** — no data loaders, potential modules, or solver aliases. You bring
@@ -49,6 +54,7 @@ grad_fn = jax.grad(log_posterior)             # ascent gradient, any pytree
 kernel = samplax.sghmc(alpha=0.1, preconditioner=samplax.rmsprop())
 sched  = samplax.cyclical(num_training_steps=50_000, num_cycles=4,
                           initial_step_size=1e-4)   # -> cyclical pSGHMC
+# also available: constant, exponential, polynomial
 
 state = kernel.init(key, position)
 def body(state, inp):

@@ -25,7 +25,7 @@ from .schedules import ScheduleState, constant, cyclical, exponential, polynomia
 from .transforms import quant, vc
 from .transforms.lp_sgld import LPKernel, lp_sgld
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "Kernel", "gaussian_like",
