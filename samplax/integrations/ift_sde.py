@@ -86,6 +86,8 @@ class SGMCMCConfig:
     kernel: str = "sghmc"            # "sgld" | "sghmc"
     alpha: float = 0.1               # sghmc friction
     preconditioner: str = "identity"  # "identity" | "rmsprop"
+    rmsprop_beta: float = 0.99        # rmsprop EMA decay (used when preconditioner="rmsprop")
+    rmsprop_eps: float = 1e-5         # rmsprop damping   (ift-sde NPSGLDConfig.delta analog)
     iterations: int = 20_000
     chains: int = 4
     burn_in: int = 5_000
@@ -159,7 +161,12 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
 
     grad_fn = jax.grad(log_posterior)
 
-    precond = {"identity": identity, "rmsprop": rmsprop}[cfg.preconditioner]()
+    if cfg.preconditioner == "identity":
+        precond = identity()
+    elif cfg.preconditioner == "rmsprop":
+        precond = rmsprop(beta=cfg.rmsprop_beta, eps=cfg.rmsprop_eps)
+    else:
+        raise ValueError(f"unknown preconditioner {cfg.preconditioner!r}")
     kernel = (sgld(preconditioner=precond) if cfg.kernel == "sgld"
               else sghmc(alpha=cfg.alpha, preconditioner=precond))
     schedule = {

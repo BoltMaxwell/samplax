@@ -250,3 +250,24 @@ def test_correction_init_keys_per_chain():
     # If all chains got the same key, they would all have the same init value.
     # With per-chain keys, they should differ (very unlikely to all be equal).
     assert not np.allclose(cstates, cstates[0])
+
+
+def test_rmsprop_hyperparams_configurable():
+    """SGMCMCConfig.rmsprop_beta/eps reach the preconditioner (ift-sde wrapper needs this)."""
+    def loglik(w, theta, x0):
+        return -0.5 * jnp.sum(w**2) + 0.0 * theta.sum() + 0.0 * x0.sum()
+
+    def energy(w, theta, x0):
+        return jnp.asarray(0.0) * jnp.sum(w)
+
+    cfg = ift_sde.SGMCMCConfig(kernel="sgld", preconditioner="rmsprop",
+                       rmsprop_beta=0.95, rmsprop_eps=0.1,
+                       iterations=200, burn_in=100, thinning=10, chains=2,
+                       step_size=1e-3)
+    res = ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
+                     log_likelihood_fn=loglik, energy_fn=energy, config=cfg)
+    assert np.all(np.isfinite(res.samples["z_samples"]))
+    with pytest.raises(ValueError):
+        bad = ift_sde.SGMCMCConfig(preconditioner="dense_fisher")
+        ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
+                   log_likelihood_fn=loglik, energy_fn=energy, config=bad)
