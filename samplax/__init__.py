@@ -21,11 +21,11 @@ from .kernels.hmc import hmc
 from .kernels.sghmc import SGHMCState, sghmc
 from .kernels.sgld import SGLDState, sgld
 from .preconditioners import Preconditioner, identity, rmsprop
-from .schedules import ScheduleState, constant, cyclical, polynomial
+from .schedules import ScheduleState, constant, cyclical, exponential, polynomial
 from .transforms import quant, vc
 from .transforms.lp_sgld import LPKernel, lp_sgld
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "Kernel", "gaussian_like",
@@ -33,6 +33,6 @@ __all__ = [
     "hmc", "amagold", "amagold_minibatch",
     "lp_sgld", "LPKernel", "quant", "vc",
     "Preconditioner", "identity", "rmsprop",
-    "schedules", "ScheduleState", "constant", "cyclical", "polynomial",
+    "schedules", "ScheduleState", "constant", "cyclical", "exponential", "polynomial",
     "gibbs_precision",
 ]
