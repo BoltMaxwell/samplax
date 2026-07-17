@@ -57,6 +57,7 @@ x64: ift-sde enables ``jax_enable_x64``; these adapters follow the dtype of
 the inputs, so they run in float64 there and float32 elsewhere.
 """
 
+import warnings
 from dataclasses import dataclass
 from typing import Callable, NamedTuple, Optional
 
@@ -65,6 +66,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.flatten_util import ravel_pytree
 
+from ..kernels.amagold import amagold
 from ..kernels.sghmc import sghmc
 from ..kernels.sgld import sgld
 from ..preconditioners import identity, rmsprop
@@ -113,6 +115,9 @@ class SGMCMCConfig:
     grad_clip: float = 1.0e3
     state_clip: float = 1.0e6
     trace_every: int = 1_000
+    amagold_dt: Optional[float] = None  # AMAGOLD leapfrog step (kernel="amagold")
+    amagold_nstep: int = 5               # AMAGOLD inner leapfrog steps per outer step
+    amagold_C: float = 1.0               # AMAGOLD friction
 
 
 @dataclass
@@ -139,6 +144,14 @@ def _sanitize_position(candidate, old, clip):
     return jnp.clip(jnp.where(jnp.isfinite(candidate), candidate, old), -clip, clip)
 
 
+def _assemble_samples(kept, cfg, d_w, d_theta, d_x0, d_z):
+    z_samples = np.stack(kept, axis=1) if kept else np.zeros((cfg.chains, 0, d_z))
+    w_s, th_s, x0_s = (z_samples[..., :d_w],
+                       z_samples[..., d_w:d_w + d_theta],
+                       z_samples[..., d_w + d_theta:])
+    return z_samples, w_s, th_s, x0_s
+
+
 def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
                config: Optional[SGMCMCConfig] = None,
                log_prior_fn: Optional[Callable] = None,
@@ -152,7 +165,8 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
             f"step_size_final)")
     d_z = d_w + d_theta + d_x0
 
-    if cfg.schedule == "exponential" and cfg.step_size_final is None:
+    if (cfg.kernel != "amagold" and cfg.schedule == "exponential"
+            and cfg.step_size_final is None):
         raise ValueError("schedule='exponential' requires step_size_final to be set")
 
     if cfg.init_mean is None:
@@ -172,6 +186,10 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
                 + _normal_logpdf(x0, jnp.asarray(cfg.x0_prior_std)))
 
     grad_fn = jax.grad(log_posterior)
+
+    if cfg.kernel == "amagold":
+        return _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z,
+                            init_mean, log_posterior, grad_fn, correction)
 
     if cfg.preconditioner == "identity":
         precond = identity()
@@ -252,16 +270,92 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
             trace_t.append(step_now)
             trace_lp.append(np.asarray(lps[-1]).tolist())
 
-    z_samples = np.stack(kept, axis=1) if kept else np.zeros((cfg.chains, 0, d_z))
-    w_s, th_s, x0_s = (z_samples[..., :d_w],
-                       z_samples[..., d_w:d_w + d_theta],
-                       z_samples[..., d_w + d_theta:])
+    z_samples, w_s, th_s, x0_s = _assemble_samples(kept, cfg, d_w, d_theta, d_x0, d_z)
     return SGMCMCResult(
         samples={"z_samples": z_samples, "w_samples": w_s,
                  "theta_samples": th_s, "x0_samples": x0_s},
         history={"step": trace_t, "log_posterior": trace_lp},
         final_state={"z": np.asarray(states.position),
                      "correction": jax.tree_util.tree_map(np.asarray, cstates)},
+        config=cfg,
+    )
+
+
+def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
+                  log_posterior, grad_fn, correction):
+    """AMAGOLD driver: a separate scan/keep-mask path, not a per-step Kernel.
+
+    AMAGOLD owns its own leapfrog loop and an amortized M-H test, so it has
+    no schedule, no temperature, and (currently) no nested-Z correction --
+    the M-H test needs the *true* energy, which a Correction's additive
+    gradient contribution does not provide. Every post-burn-in chunk end is
+    kept (there is no cyclical-style do_sample gate to consult).
+    """
+    if cfg.amagold_dt is None:
+        raise ValueError("amagold requires amagold_dt")
+    if correction is not None:
+        raise ValueError(
+            "AMAGOLD's M-H correction needs the true energy; it does not "
+            "compose with a nested-Z correction -- use kernel='sgld'/"
+            "'sghmc' for correction, or an energy that is "
+            "(theta,x0)-independent")
+    if cfg.schedule != "constant":
+        warnings.warn(
+            "amagold ignores cfg.schedule: step size is fixed by "
+            "amagold_dt and there is no temperature schedule under the "
+            "M-H correction")
+
+    def u_fn(z):
+        return -log_posterior(z)
+
+    def grad_u(key, z):
+        return _sanitize_grad(-grad_fn(z), cfg.grad_clip)
+
+    kernel_step = amagold(u_fn, grad_u, dt=cfg.amagold_dt,
+                          nstep=cfg.amagold_nstep, C=cfg.amagold_C)
+
+    key_init, key_run = jax.random.split(jnp.asarray(rng_key), 2)
+    positions = init_mean[None, :] + cfg.init_std * jax.random.normal(
+        key_init, (cfg.chains, d_z))
+
+    def one_step(carry, keys):
+        positions, accept_sum = carry
+        new_positions, accepted = jax.vmap(kernel_step)(keys, positions)
+        accept_sum = accept_sum + accepted.astype(accept_sum.dtype)
+        lp = jax.vmap(log_posterior)(new_positions)
+        return (new_positions, accept_sum), (lp, accepted)
+
+    @jax.jit
+    def run_chunk(positions, accept_sum, keys):
+        return jax.lax.scan(one_step, (positions, accept_sum), keys)
+
+    n_chunks = cfg.iterations // cfg.thinning
+    kept, trace_t, trace_lp, accept_history = [], [], [], []
+    accept_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
+    for c in range(n_chunks):
+        key_run, sub = jax.random.split(key_run)
+        keys = jax.random.split(sub, (cfg.thinning, cfg.chains))
+        (positions, accept_sum), (lps, accepted) = run_chunk(
+            positions, accept_sum, keys)
+        step_now = (c + 1) * cfg.thinning
+        # AMAGOLD always samples (no cyclical-style exploration phase): keep
+        # every post-burn-in chunk end.
+        if step_now > cfg.burn_in:
+            kept.append(np.asarray(positions))
+        accept_history.append(float(np.asarray(accepted).mean()))
+        if step_now % cfg.trace_every == 0 or c == n_chunks - 1:
+            trace_t.append(step_now)
+            trace_lp.append(np.asarray(lps[-1]).tolist())
+
+    z_samples, w_s, th_s, x0_s = _assemble_samples(kept, cfg, d_w, d_theta, d_x0, d_z)
+    accept_rate = np.asarray(accept_sum) / cfg.iterations
+    return SGMCMCResult(
+        samples={"z_samples": z_samples, "w_samples": w_s,
+                 "theta_samples": th_s, "x0_samples": x0_s},
+        history={"step": trace_t, "log_posterior": trace_lp,
+                 "accept_rate": accept_history},
+        final_state={"z": np.asarray(positions), "accept_rate": accept_rate,
+                     "correction": ()},
         config=cfg,
     )
 
