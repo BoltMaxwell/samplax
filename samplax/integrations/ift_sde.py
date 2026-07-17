@@ -48,6 +48,15 @@ is reverted to its pre-step value wherever it turned non-finite and then
 clipped elementwise to ``state_clip`` (kernel-state fields other than
 ``position`` — momentum, preconditioner accumulators — are left untouched).
 
+AMAGOLD M-H kernel (``kernel="amagold"``) accepts `amagold_dt`, `amagold_nstep`,
+and `amagold_C` config; M-H acceptance data flow differs from SGLD/SGHMC:
+``history["accept_rate"]`` is appended every chunk (not gated by ``trace_every``),
+so its length differs from ``history["step"]``/``history["log_posterior"]``; also,
+``history["accept_rate"]`` is pooled over chains+time per chunk (scalar), while
+``final_state["accept_rate"]`` is per-chain (shape ``(chains,)``). Requires
+``correction=None`` (M-H test needs the true energy) and ``dt`` (leapfrog
+stepsize, required).
+
 Nesting-I seam (``experiments/calibration/param_loop.py``):
 :func:`make_field_sampler` builds the inner-field-sampler boundary callable
 ``f(field_state, param_state, key) -> field_chain`` from a samplax kernel and

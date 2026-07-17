@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] — 2026-07-17
+
+### Added
+
+- **AMAGOLD driver branch**: `ift_sde.run_sgmcmc` now supports `kernel="amagold"` for
+  the M-H-corrected AMAGOLD simulation form (Zhang, Cooper, De Sa 2020), achieving
+  unbiased sampling at large step sizes (verified: unbiased on N(0,1) where SGLD at
+  matched step has stationary variance 4×). Configured via `amagold_dt` (leapfrog
+  stepsize, required), `amagold_nstep`, and `amagold_C` (friction); composes with
+  `correction=None` only (M-H test needs the true energy).
+- **accept_rate in result/history**: `run_sgmcmc` returns `final_state["accept_rate"]`
+  (per-chain) and `history["accept_rate"]` (pooled scalar per chunk, not gated by
+  `trace_every`, so its length differs from `history["step"]`/`history["log_posterior"]`).
+- **5 new tests** (48 total).
+
 ## [0.2.1] — 2026-07-15
 
 ### Fixed

@@ -21,7 +21,7 @@ This is a personal, curated sampling book — provenance over coverage.
 Integrations
 ------------
 
-The `samplax.integrations` package holds adapter and composition code of ift-sde origin, not vendored-kernel provenance classes. Currently: `ift_sde` (engine adapter for the ift-sde `run_sgmcmc` sampler seam, with a stateful `Correction` protocol); `nested` (persistent-PCD ∇log Z correction with optional re-warm policy, Tieleman 2008 framing).
+The `samplax.integrations` package holds adapter and composition code of ift-sde origin, not vendored-kernel provenance classes. Currently: `ift_sde` (engine adapter for the ift-sde `run_sgmcmc` sampler seam, with a stateful `Correction` protocol; also supports `kernel="amagold"` for M-H-corrected AMAGOLD simulation with unbiased sampling at large step sizes, composed with `correction=None` only); `nested` (persistent-PCD ∇log Z correction with optional re-warm policy, Tieleman 2008 framing).
 
 How this differs from [jax-sgmc](https://github.com/tummfm/jax-sgmc) /
 [sgmcmcjax](https://github.com/jeremiecoullon/SGMCMCJax): samplax is **not a
