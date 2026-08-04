@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] — 2026-08-04
+
+### Added
+
+- **Diagonal-mass-matrix AMAGOLD**: `kernels.amagold` accepts a per-coordinate
+  `dt` vector (plus optional scalar `dt_friction` for the thermostat step).
+  Exactness reduces to the scalar kernel via coordinate rescaling — see the
+  kernel docstring for the identity. Integration-side, `SGMCMCConfig` gains
+  `amagold_dt_theta` / `amagold_dt_x0` (per-block steps expanded over the
+  [w | theta | x0] layout) and `amagold_dt_friction`. Motivated by the
+  whitened-Duffing failure where one scalar dt froze the theta block
+  (ift-sde sampler_experimentation v5).
+- **5 new tests** (53 total): equal-entry-vector ≡ scalar, anisotropic-Gaussian
+  exactness + decorrelation contrast, per-block integration path, loud
+  preconditioner raise, thermostat-noise regression.
+
+### Fixed
+
+- **Thermostat noise was a scalar broadcast**: the simulation-form kernel drew
+  ONE normal per leapfrog substep and added it to every coordinate, correlating
+  momenta within a trajectory (only correct at d = 1; a vendoring slip — the
+  minibatch form was already per-coordinate via `gaussian_like`). Now
+  per-coordinate. Seeded results differ from pre-0.4.0 runs; the statistical
+  correctness tests (unbiased N(0,1), acceptance band) pass unchanged.
+
+### Changed
+
+- **`kernel="amagold"` now raises on `preconditioner != "identity"`** instead
+  of silently ignoring it (a "preconditioned AMAGOLD" that never existed made
+  it into results — loud-failure doctrine). Express anisotropy via the
+  per-block dts.
+
 ## [0.3.0] — 2026-07-17
 
 ### Added

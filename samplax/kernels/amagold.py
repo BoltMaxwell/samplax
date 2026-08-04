@@ -25,15 +25,41 @@ import jax.numpy as jnp
 from ..base import gaussian_like
 
 
-def amagold(u_fn, grad_u, *, dt, nstep, C, mh=True):
+def amagold(u_fn, grad_u, *, dt, nstep, C, mh=True, dt_friction=None):
     """Simulation-form AMAGOLD (amagold-jax ``samplers.amagold_kernel``).
 
-    Semi-implicit friction leapfrog with beta = C/2, noise sqrt(2 dt C), and
+    Semi-implicit friction leapfrog with beta = C/2, noise sqrt(2 dt_f C), and
     acceptance probability exp(U_old - U_new + rho) where rho accumulates
     the kinetic correction along the path.
     Returns ``step(key, x) -> (new_x, accepted)``.
+
+    ``dt`` may be a scalar or a per-coordinate vector (shape of ``x``). A
+    vector dt is the diagonal-mass-matrix form, and its exactness reduces to
+    the scalar kernel's: with thermostat step ``dt_f`` (scalar) and
+    S = diag(dt / dt_f), running THIS kernel on U at vector dt is identical,
+    coordinate by coordinate, to running the scalar kernel at step dt_f on
+    the rescaled potential ``U_tilde(z) = U(S z)`` (position/gradient/rho
+    terms pick up one factor of S each; energies are invariant since
+    U_tilde(z) = U(x)). The M-H test is therefore exact for any dt_f > 0.
+    ``dt_friction`` sets that scalar thermostat step; default: ``dt`` itself
+    when scalar, mean(dt) when vector. The friction/noise factors must stay
+    scalar — they discretize the momentum OU process, whose semi-implicit
+    update preserves N(0, I) exactly at any scalar step (that identity is
+    what beta = C/2 encodes).
+
+    Fix vs the original vendoring (2026-08): the thermostat noise is drawn
+    per-coordinate (``jax.random.normal(k_noise, shape(p))``). The vendored
+    port drew a SINGLE scalar normal broadcast across all coordinates, which
+    correlates momenta within a trajectory and is only correct at d = 1 (the
+    original simulation studies). Negligible at tiny dt, wrong in general;
+    seeded results differ from pre-fix runs.
     """
-    sigma = jnp.sqrt(2.0 * dt * C)
+    dt = jnp.asarray(dt)
+    if dt_friction is None:
+        dt_f = dt if dt.ndim == 0 else jnp.mean(dt)
+    else:
+        dt_f = jnp.asarray(dt_friction)
+    sigma = jnp.sqrt(2.0 * dt_f * C)
     beta = 0.5 * C
 
     def step(key, x):
@@ -50,9 +76,9 @@ def amagold(u_fn, grad_u, *, dt, nstep, C, mh=True):
             x = jnp.where(i > 0, x + p * dt, x)
             p_old = p
             grad_x = grad_u(k_grad, x)
-            p = ((1.0 - dt * beta) * p - grad_x * dt
-                 + jax.random.normal(k_noise) * sigma) / (1.0 + dt * beta)
-            rho = rho + jnp.sum(grad_x * (p + p_old)) * dt / 2.0
+            p = ((1.0 - dt_f * beta) * p - grad_x * dt
+                 + jax.random.normal(k_noise, jnp.shape(p)) * sigma) / (1.0 + dt_f * beta)
+            rho = rho + 0.5 * jnp.sum(grad_x * (p + p_old) * dt)
             return (x, p, rho), None
 
         (x, p, rho), _ = jax.lax.scan(

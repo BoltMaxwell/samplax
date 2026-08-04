@@ -124,9 +124,19 @@ class SGMCMCConfig:
     grad_clip: float = 1.0e3
     state_clip: float = 1.0e6
     trace_every: int = 1_000
-    amagold_dt: Optional[float] = None  # AMAGOLD leapfrog step (kernel="amagold")
+    amagold_dt: Optional[float] = None  # AMAGOLD leapfrog step (kernel="amagold"); w-block step when block dts are set
     amagold_nstep: int = 5               # AMAGOLD inner leapfrog steps per outer step
     amagold_C: float = 1.0               # AMAGOLD friction
+    # Per-block leapfrog steps (diagonal mass matrix). When set, the kernel dt
+    # becomes the (d_z,) vector [amagold_dt]*d_w + [amagold_dt_theta]*d_theta
+    # + [amagold_dt_x0]*d_x0. This is the fix for stiff-w/mobile-theta targets
+    # (whitened Duffing: one scalar dt froze theta — ift-sde
+    # sampler_experimentation v5). amagold_dt_x0 defaults to amagold_dt_theta.
+    amagold_dt_theta: Optional[float] = None
+    amagold_dt_x0: Optional[float] = None
+    # Scalar thermostat step for the friction/noise discretization (see the
+    # kernel docstring; any positive scalar is exact). Default: amagold_dt.
+    amagold_dt_friction: Optional[float] = None
 
 
 @dataclass
@@ -308,6 +318,15 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
             "compose with a nested-Z correction -- use kernel='sgld'/"
             "'sghmc' for correction, or an energy that is "
             "(theta,x0)-independent")
+    if cfg.preconditioner not in ("identity",):
+        # Loud by doctrine: this flag was silently inert for a month and a
+        # "preconditioned AMAGOLD" that never existed made it into results
+        # (ift-sde sampler_experimentation v5). Per-block dts are the
+        # supported anisotropy mechanism for this kernel.
+        raise ValueError(
+            f"amagold has no preconditioner (got {cfg.preconditioner!r}); "
+            "use preconditioner='identity' and express anisotropy via "
+            "amagold_dt_theta / amagold_dt_x0 (diagonal mass matrix)")
     if cfg.schedule != "constant":
         warnings.warn(
             "amagold ignores cfg.schedule: step size is fixed by "
@@ -320,8 +339,20 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
     def grad_u(key, z):
         return _sanitize_grad(-grad_fn(z), cfg.grad_clip)
 
-    kernel_step = amagold(u_fn, grad_u, dt=cfg.amagold_dt,
-                          nstep=cfg.amagold_nstep, C=cfg.amagold_C)
+    if cfg.amagold_dt_theta is not None or cfg.amagold_dt_x0 is not None:
+        dt_theta = cfg.amagold_dt_theta if cfg.amagold_dt_theta is not None else cfg.amagold_dt
+        dt_x0 = cfg.amagold_dt_x0 if cfg.amagold_dt_x0 is not None else dt_theta
+        dt = jnp.concatenate([
+            jnp.full((d_w,), cfg.amagold_dt, dtype=jnp.float64),
+            jnp.full((d_theta,), dt_theta, dtype=jnp.float64),
+            jnp.full((d_x0,), dt_x0, dtype=jnp.float64),
+        ])
+    else:
+        dt = cfg.amagold_dt
+
+    kernel_step = amagold(u_fn, grad_u, dt=dt,
+                          nstep=cfg.amagold_nstep, C=cfg.amagold_C,
+                          dt_friction=cfg.amagold_dt_friction)
 
     key_init, key_run = jax.random.split(jnp.asarray(rng_key), 2)
     positions = init_mean[None, :] + cfg.init_std * jax.random.normal(
