@@ -19,7 +19,7 @@ from samplax.kernels.pcn_gibbs import pcn_gibbs
 def _run(step, key, z0, n):
     def body(carry, k):
         z, aw, ar = carry
-        z_new, (a_w, a_r) = step(k, z)
+        z_new, (a_w, a_r, _a_s) = step(k, z)
         return (z_new, aw + a_w, ar + a_r), z_new
 
     (z, aw, ar), zs = jax.lax.scan(body, (z0, jnp.zeros(()), jnp.zeros(())),
@@ -92,3 +92,55 @@ def test_validation():
         pcn_gibbs(_f, d_w=2, beta=0.0, mh_scales=jnp.asarray([0.1]))
     with pytest.raises(ValueError, match="n_pcn"):
         pcn_gibbs(_f, d_w=2, beta=0.5, mh_scales=jnp.asarray([0.1]), n_pcn=0)
+    with pytest.raises(ValueError, match="scale_index"):
+        pcn_gibbs(_f, d_w=2, beta=0.5, mh_scales=jnp.asarray([0.1]), scale_index=5)
+
+
+def test_scale_move_preserves_nonridge_target():
+    """The ridge-scale move is a valid M-H move for ANY target; adding it to
+    the linear-Gaussian toy (whose geometry it does NOT match) must leave the
+    posterior unchanged — this pins the acceptance formula (prior ratio +
+    Jacobian): a sign error would visibly shift the moments."""
+    step = pcn_gibbs(_f, d_w=D_W, beta=0.5, mh_scales=jnp.asarray([0.8]),
+                     n_pcn=2, n_mh=2, scale_index=0, scale_step=0.4, n_scale=2)
+    zs, _, _ = _run(step, jax.random.key(3), jnp.zeros(3), 60_000)
+    zs = zs[10_000:]
+    mean, cov = _analytic_posterior(A, S, Y)
+    np.testing.assert_allclose(zs.mean(axis=0), mean, atol=0.04)
+    np.testing.assert_allclose(np.sqrt(np.diag(np.cov(zs.T))),
+                               np.sqrt(np.diag(cov)), rtol=0.08)
+
+
+def test_scale_move_beats_ridge():
+    """Whitened amplitude ridge in miniature: w ~ N(0,1), log s ~ N(0,1),
+    y = 2.0 observed with y ~ N(e^{log s} w, 0.05^2). The exact marginals come
+    from 2-D grid integration; the scale-move sampler must reproduce them at a
+    budget where the likelihood is invariant along the move (Delta f = 0), so
+    the ridge is traversed by prior/Jacobian terms alone."""
+    s_obs, y = 0.05, 2.0
+
+    def f(z):
+        w, ls = z[0], z[1]
+        return -0.5 * (y - jnp.exp(ls) * w) ** 2 / s_obs**2 - 0.5 * ls**2
+
+    # exact marginals by grid integration (posterior includes the w prior)
+    wg = np.linspace(-8, 8, 1601)
+    lg = np.linspace(-5, 5, 1601)
+    W, L = np.meshgrid(wg, lg, indexing="ij")
+    logp = (-0.5 * (y - np.exp(L) * W) ** 2 / s_obs**2 - 0.5 * L**2
+            - 0.5 * W**2)
+    p = np.exp(logp - logp.max())
+    p /= p.sum()
+    mean_ls = (p.sum(axis=0) * lg).sum()
+    std_ls = np.sqrt((p.sum(axis=0) * (lg - mean_ls) ** 2).sum())
+    mean_w = (p.sum(axis=1) * wg).sum()
+    std_w = np.sqrt((p.sum(axis=1) * (wg - mean_w) ** 2).sum())
+
+    step = pcn_gibbs(f, d_w=1, beta=0.05, mh_scales=jnp.asarray([0.05]),
+                     n_pcn=2, n_mh=2, scale_index=0, scale_step=0.5, n_scale=2)
+    zs, _, _ = _run(step, jax.random.key(4), jnp.asarray([1.5, 0.3]), 80_000)
+    zs = zs[20_000:]
+    assert abs(zs[:, 1].mean() - mean_ls) < 0.08, (zs[:, 1].mean(), mean_ls)
+    assert abs(zs[:, 1].std() - std_ls) < 0.08, (zs[:, 1].std(), std_ls)
+    assert abs(zs[:, 0].mean() - mean_w) < 0.1, (zs[:, 0].mean(), mean_w)
+    assert abs(zs[:, 0].std() - std_w) < 0.1, (zs[:, 0].std(), std_w)

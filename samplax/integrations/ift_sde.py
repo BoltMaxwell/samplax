@@ -147,6 +147,14 @@ class SGMCMCConfig:
     pcn_n_mh: int = 5                # (theta, x0)-updates per sweep
     pcn_mh_scale: float = 0.02       # scalar RW proposal scale for (theta, x0)
     pcn_mh_scales: Optional[tuple] = None  # per-coordinate override
+    # Ridge-scale (interweaving) move: index of the log-scale coordinate in
+    # the (theta, x0) block that multiplies the whitened field (e.g. log sigma
+    # for OU raw index 2, log sigma_v for the Duffing noncentered variant
+    # index 3). None disables. See kernels.pcn_gibbs for the exactness
+    # argument; it is what traverses the sigma-w amplitude ridge.
+    pcn_scale_index: Optional[int] = None
+    pcn_scale_step: float = 0.2
+    pcn_n_scale: int = 2
 
 
 @dataclass
@@ -475,37 +483,42 @@ def _run_pcn_gibbs(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
         mh_scales = jnp.full((d_rest,), cfg.pcn_mh_scale, dtype=jnp.float64)
 
     kernel_step = pcn_gibbs(f, d_w=d_w, beta=cfg.pcn_beta, mh_scales=mh_scales,
-                            n_pcn=cfg.pcn_n_pcn, n_mh=cfg.pcn_n_mh)
+                            n_pcn=cfg.pcn_n_pcn, n_mh=cfg.pcn_n_mh,
+                            scale_index=cfg.pcn_scale_index,
+                            scale_step=cfg.pcn_scale_step,
+                            n_scale=cfg.pcn_n_scale)
 
     key_init, key_run = jax.random.split(jnp.asarray(rng_key), 2)
     positions = init_mean[None, :] + cfg.init_std * jax.random.normal(
         key_init, (cfg.chains, d_z))
 
     def one_step(carry, keys):
-        positions, aw_sum, ar_sum = carry
-        new_positions, (aw, ar) = jax.vmap(kernel_step)(keys, positions)
+        positions, aw_sum, ar_sum, as_sum = carry
+        new_positions, (aw, ar, a_s) = jax.vmap(kernel_step)(keys, positions)
         lp = jax.vmap(f)(new_positions)
-        return (new_positions, aw_sum + aw, ar_sum + ar), (lp, aw, ar)
+        return (new_positions, aw_sum + aw, ar_sum + ar, as_sum + a_s), (lp, aw, ar, a_s)
 
     @jax.jit
-    def run_chunk(positions, aw_sum, ar_sum, keys):
-        return jax.lax.scan(one_step, (positions, aw_sum, ar_sum), keys)
+    def run_chunk(positions, aw_sum, ar_sum, as_sum, keys):
+        return jax.lax.scan(one_step, (positions, aw_sum, ar_sum, as_sum), keys)
 
     n_chunks = cfg.iterations // cfg.thinning
     kept, trace_t, trace_lp = [], [], []
-    accept_w_hist, accept_r_hist = [], []
+    accept_w_hist, accept_r_hist, accept_s_hist = [], [], []
     aw_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
     ar_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
+    as_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
     for c in range(n_chunks):
         key_run, sub = jax.random.split(key_run)
         keys = jax.random.split(sub, (cfg.thinning, cfg.chains))
-        (positions, aw_sum, ar_sum), (lps, aws, ars) = run_chunk(
-            positions, aw_sum, ar_sum, keys)
+        (positions, aw_sum, ar_sum, as_sum), (lps, aws, ars, ass) = run_chunk(
+            positions, aw_sum, ar_sum, as_sum, keys)
         step_now = (c + 1) * cfg.thinning
         if step_now > cfg.burn_in:
             kept.append(np.asarray(positions))
         accept_w_hist.append(float(np.asarray(aws).mean()))
         accept_r_hist.append(float(np.asarray(ars).mean()))
+        accept_s_hist.append(float(np.asarray(ass).mean()))
         if step_now % cfg.trace_every == 0 or c == n_chunks - 1:
             trace_t.append(step_now)
             trace_lp.append(np.asarray(lps[-1]).tolist())
@@ -515,10 +528,12 @@ def _run_pcn_gibbs(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
         samples={"z_samples": z_samples, "w_samples": w_s,
                  "theta_samples": th_s, "x0_samples": x0_s},
         history={"step": trace_t, "log_posterior": trace_lp,
-                 "accept_w": accept_w_hist, "accept_theta": accept_r_hist},
+                 "accept_w": accept_w_hist, "accept_theta": accept_r_hist,
+                 "accept_scale": accept_s_hist},
         final_state={"z": np.asarray(positions),
                      "accept_rate_w": np.asarray(aw_sum) / cfg.iterations,
                      "accept_rate_theta": np.asarray(ar_sum) / cfg.iterations,
+                     "accept_rate_scale": np.asarray(as_sum) / cfg.iterations,
                      "correction": ()},
         config=cfg,
     )
