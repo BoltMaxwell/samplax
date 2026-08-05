@@ -76,6 +76,7 @@ import numpy as np
 from jax.flatten_util import ravel_pytree
 
 from ..kernels.amagold import amagold
+from ..kernels.pcn_gibbs import pcn_gibbs
 from ..kernels.sghmc import sghmc
 from ..kernels.sgld import sgld
 from ..preconditioners import identity, rmsprop
@@ -137,6 +138,15 @@ class SGMCMCConfig:
     # Scalar thermostat step for the friction/noise discretization (see the
     # kernel docstring; any positive scalar is exact). Default: amagold_dt.
     amagold_dt_friction: Optional[float] = None
+    # pCN-within-Gibbs (kernel="pcn-gibbs"): gradient-free blocked M-H for
+    # whitened targets (energy must be the isotropic w-prior ||w||^2/2 — probed
+    # at setup). pcn_mh_scales (length d_theta + d_x0) overrides the scalar
+    # pcn_mh_scale for per-coordinate proposal widths on the (theta, x0) block.
+    pcn_beta: float = 0.1            # pCN proposal mixing in (0, 1]
+    pcn_n_pcn: int = 5               # w-updates per sweep
+    pcn_n_mh: int = 5                # (theta, x0)-updates per sweep
+    pcn_mh_scale: float = 0.02       # scalar RW proposal scale for (theta, x0)
+    pcn_mh_scales: Optional[tuple] = None  # per-coordinate override
 
 
 @dataclass
@@ -184,7 +194,7 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
             f"step_size_final)")
     d_z = d_w + d_theta + d_x0
 
-    if (cfg.kernel != "amagold" and cfg.schedule == "exponential"
+    if (cfg.kernel not in ("amagold", "pcn-gibbs") and cfg.schedule == "exponential"
             and cfg.step_size_final is None):
         raise ValueError("schedule='exponential' requires step_size_final to be set")
 
@@ -209,6 +219,11 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
     if cfg.kernel == "amagold":
         return _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z,
                             init_mean, log_posterior, grad_fn, correction)
+
+    if cfg.kernel == "pcn-gibbs":
+        return _run_pcn_gibbs(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
+                              log_likelihood_fn, energy_fn, log_prior_fn,
+                              correction)
 
     if cfg.preconditioner == "identity":
         precond = identity()
@@ -395,6 +410,115 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
         history={"step": trace_t, "log_posterior": trace_lp,
                  "accept_rate": accept_history},
         final_state={"z": np.asarray(positions), "accept_rate": accept_rate,
+                     "correction": ()},
+        config=cfg,
+    )
+
+
+def _run_pcn_gibbs(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
+                   log_likelihood_fn, energy_fn, log_prior_fn, correction):
+    """pCN-within-Gibbs driver: gradient-free blocked M-H (kernels.pcn_gibbs).
+
+    Valid ONLY for whitened targets whose energy is the isotropic w-prior
+    ``||w||^2/2`` (+ a constant): the pCN move absorbs that prior into its
+    proposal, so the sweep targets loglik + theta/x0 priors. The requirement
+    is PROBED at setup (three random points) and violated energies raise.
+    Like AMAGOLD: no schedule, no preconditioner, no nested correction.
+    """
+    if correction is not None:
+        raise ValueError(
+            "pcn-gibbs does not compose with a nested-Z correction; the "
+            "whitened (constant-Z) targets it exists for do not need one")
+    if cfg.preconditioner not in ("identity",):
+        raise ValueError(
+            f"pcn-gibbs has no preconditioner (got {cfg.preconditioner!r}); "
+            "use preconditioner='identity' and set pcn_mh_scales for "
+            "per-coordinate (theta, x0) proposal widths")
+    if cfg.schedule != "constant":
+        warnings.warn("pcn-gibbs ignores cfg.schedule: pcn_beta and "
+                      "pcn_mh_scale(s) are fixed; there is no step schedule")
+    if log_prior_fn is not None:
+        raise ValueError(
+            "pcn-gibbs builds its own target from theta_prior_std/x0_prior_std; "
+            "a custom log_prior_fn is not supported (it could depend on w, "
+            "which would break the pCN prior cancellation)")
+
+    # Probe: energy must equal ||w||^2/2 + const (theta/x0-independent too).
+    probe_key = jax.random.PRNGKey(0)
+    consts = []
+    for i in range(3):
+        k1, k2, k3, probe_key = jax.random.split(jax.random.fold_in(probe_key, i), 4)
+        w_p = jax.random.normal(k1, (max(d_w, 1),))[:d_w]
+        th_p = jax.random.normal(k2, (max(d_theta, 1),))[:d_theta]
+        x0_p = jax.random.normal(k3, (max(d_x0, 1),))[:d_x0]
+        e = energy_fn(w_p, th_p, x0_p)
+        consts.append(float(e - 0.5 * jnp.sum(w_p**2)))
+    if max(consts) - min(consts) > 1e-6 * max(1.0, abs(consts[0])):
+        raise ValueError(
+            "pcn-gibbs requires energy_fn(w, theta, x0) == ||w||^2/2 + const "
+            f"(whitened target); probe found varying residuals {consts}. Use "
+            "kernel='sgld'/'sghmc' for non-whitened energies")
+
+    def f(z):
+        w, theta, x0 = _split_z(z, d_w, d_theta)
+        return (log_likelihood_fn(w, theta, x0)
+                + _normal_logpdf(theta, jnp.asarray(cfg.theta_prior_std))
+                + _normal_logpdf(x0, jnp.asarray(cfg.x0_prior_std)))
+
+    d_rest = d_theta + d_x0
+    if cfg.pcn_mh_scales is not None:
+        mh_scales = jnp.asarray(cfg.pcn_mh_scales, dtype=jnp.float64)
+        if mh_scales.shape[0] != d_rest:
+            raise ValueError(
+                f"pcn_mh_scales has length {mh_scales.shape[0]}, expected {d_rest}")
+    else:
+        mh_scales = jnp.full((d_rest,), cfg.pcn_mh_scale, dtype=jnp.float64)
+
+    kernel_step = pcn_gibbs(f, d_w=d_w, beta=cfg.pcn_beta, mh_scales=mh_scales,
+                            n_pcn=cfg.pcn_n_pcn, n_mh=cfg.pcn_n_mh)
+
+    key_init, key_run = jax.random.split(jnp.asarray(rng_key), 2)
+    positions = init_mean[None, :] + cfg.init_std * jax.random.normal(
+        key_init, (cfg.chains, d_z))
+
+    def one_step(carry, keys):
+        positions, aw_sum, ar_sum = carry
+        new_positions, (aw, ar) = jax.vmap(kernel_step)(keys, positions)
+        lp = jax.vmap(f)(new_positions)
+        return (new_positions, aw_sum + aw, ar_sum + ar), (lp, aw, ar)
+
+    @jax.jit
+    def run_chunk(positions, aw_sum, ar_sum, keys):
+        return jax.lax.scan(one_step, (positions, aw_sum, ar_sum), keys)
+
+    n_chunks = cfg.iterations // cfg.thinning
+    kept, trace_t, trace_lp = [], [], []
+    accept_w_hist, accept_r_hist = [], []
+    aw_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
+    ar_sum = jnp.zeros((cfg.chains,), dtype=positions.dtype)
+    for c in range(n_chunks):
+        key_run, sub = jax.random.split(key_run)
+        keys = jax.random.split(sub, (cfg.thinning, cfg.chains))
+        (positions, aw_sum, ar_sum), (lps, aws, ars) = run_chunk(
+            positions, aw_sum, ar_sum, keys)
+        step_now = (c + 1) * cfg.thinning
+        if step_now > cfg.burn_in:
+            kept.append(np.asarray(positions))
+        accept_w_hist.append(float(np.asarray(aws).mean()))
+        accept_r_hist.append(float(np.asarray(ars).mean()))
+        if step_now % cfg.trace_every == 0 or c == n_chunks - 1:
+            trace_t.append(step_now)
+            trace_lp.append(np.asarray(lps[-1]).tolist())
+
+    z_samples, w_s, th_s, x0_s = _assemble_samples(kept, cfg, d_w, d_theta, d_x0, d_z)
+    return SGMCMCResult(
+        samples={"z_samples": z_samples, "w_samples": w_s,
+                 "theta_samples": th_s, "x0_samples": x0_s},
+        history={"step": trace_t, "log_posterior": trace_lp,
+                 "accept_w": accept_w_hist, "accept_theta": accept_r_hist},
+        final_state={"z": np.asarray(positions),
+                     "accept_rate_w": np.asarray(aw_sum) / cfg.iterations,
+                     "accept_rate_theta": np.asarray(ar_sum) / cfg.iterations,
                      "correction": ()},
         config=cfg,
     )

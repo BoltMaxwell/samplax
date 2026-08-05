@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] — 2026-08-05
+
+### Added
+
+- **pCN-within-Gibbs** (`kernels.pcn_gibbs`, `kernel="pcn-gibbs"` in
+  `integrations.ift_sde`): gradient-free blocked M-H for whitened targets
+  pi(z) ∝ exp(f(z))·N(w; 0, I). Per sweep: `pcn_n_pcn` preconditioned
+  Crank-Nicolson updates of w | (theta, x0) — the N(0, I) prior cancels in the
+  acceptance, giving d_w-robust mixing with no leapfrog stability ceiling —
+  then `pcn_n_mh` Gaussian random-walk M-H updates of (theta, x0) | w with
+  per-coordinate `pcn_mh_scales`. Both moves are exact conditional M-H, so the
+  sweep is pi-invariant for any tuning. Motivated by the ift-sde v5/v9
+  finding that joint-trajectory kernels fail on these targets through the
+  theta-w trajectory-coupling mechanism; blocking removes the requirement.
+- **Whitened-energy probe**: the pcn-gibbs driver verifies at setup that
+  `energy_fn == ||w||^2/2 + const` (three-point probe) and raises otherwise;
+  also raises on preconditioner != identity, custom log_prior_fn, or a nested
+  correction. History carries per-block acceptance (`accept_w`,
+  `accept_theta`).
+- **7 new tests** (60 total): closed-form linear-Gaussian posterior with
+  cross-block correlation (exact moments), beta=1 independence limit, empty
+  rest block, validation errors; adapter-level target recovery + guards +
+  probe.
+
 ## [0.4.0] — 2026-08-04
 
 ### Added
