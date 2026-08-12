@@ -75,7 +75,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.flatten_util import ravel_pytree
 
-from ..kernels.amagold import amagold
+from ..kernels.amagold import amagold_tracked
 from ..kernels.pcn_gibbs import pcn_gibbs
 from ..kernels.sghmc import sghmc
 from ..kernels.sgld import sgld
@@ -373,24 +373,31 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
     else:
         dt = cfg.amagold_dt
 
-    kernel_step = amagold(u_fn, grad_u, dt=dt,
-                          nstep=cfg.amagold_nstep, C=cfg.amagold_C,
-                          dt_friction=cfg.amagold_dt_friction)
+    # Tracked form: the energy at the current position rides in the state, so
+    # an outer step costs ONE log_posterior evaluation instead of three (the
+    # kernel's own two, plus the trace pass that used to re-evaluate it here).
+    # `lp` below is read straight off the state -- state.energy is exactly
+    # u_fn(state.position), so -state.energy is log_posterior(position) with no
+    # approximation. Safe because u_fn is fixed at build time and deterministic,
+    # which the M-H test already requires (hence the correction=None guard above).
+    kernel_init, kernel_step = amagold_tracked(
+        u_fn, grad_u, dt=dt, nstep=cfg.amagold_nstep, C=cfg.amagold_C,
+        dt_friction=cfg.amagold_dt_friction)
 
     key_init, key_run = jax.random.split(jnp.asarray(rng_key), 2)
     positions = init_mean[None, :] + cfg.init_std * jax.random.normal(
         key_init, (cfg.chains, d_z))
+    states = jax.jit(jax.vmap(kernel_init))(positions)
 
     def one_step(carry, keys):
-        positions, accept_sum = carry
-        new_positions, accepted = jax.vmap(kernel_step)(keys, positions)
+        states, accept_sum = carry
+        states, accepted = jax.vmap(kernel_step)(keys, states)
         accept_sum = accept_sum + accepted.astype(accept_sum.dtype)
-        lp = jax.vmap(log_posterior)(new_positions)
-        return (new_positions, accept_sum), (lp, accepted)
+        return (states, accept_sum), (-states.energy, accepted)
 
     @jax.jit
-    def run_chunk(positions, accept_sum, keys):
-        return jax.lax.scan(one_step, (positions, accept_sum), keys)
+    def run_chunk(states, accept_sum, keys):
+        return jax.lax.scan(one_step, (states, accept_sum), keys)
 
     n_chunks = cfg.iterations // cfg.thinning
     kept, trace_t, trace_lp, accept_history = [], [], [], []
@@ -398,13 +405,13 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
     for c in range(n_chunks):
         key_run, sub = jax.random.split(key_run)
         keys = jax.random.split(sub, (cfg.thinning, cfg.chains))
-        (positions, accept_sum), (lps, accepted) = run_chunk(
-            positions, accept_sum, keys)
+        (states, accept_sum), (lps, accepted) = run_chunk(
+            states, accept_sum, keys)
         step_now = (c + 1) * cfg.thinning
         # AMAGOLD always samples (no cyclical-style exploration phase): keep
         # every post-burn-in chunk end.
         if step_now > cfg.burn_in:
-            kept.append(np.asarray(positions))
+            kept.append(np.asarray(states.position))
         accept_history.append(float(np.asarray(accepted).mean()))
         if step_now % cfg.trace_every == 0 or c == n_chunks - 1:
             trace_t.append(step_now)
@@ -417,7 +424,7 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
                  "theta_samples": th_s, "x0_samples": x0_s},
         history={"step": trace_t, "log_posterior": trace_lp,
                  "accept_rate": accept_history},
-        final_state={"z": np.asarray(positions), "accept_rate": accept_rate,
+        final_state={"z": np.asarray(states.position), "accept_rate": accept_rate,
                      "correction": ()},
         config=cfg,
     )

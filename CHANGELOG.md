@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] — 2026-08-11
+
+### Changed
+
+- **AMAGOLD evaluates the full-data energy once per step instead of twice.**
+  The M-H test needs the potential at both ends of the trajectory, but the
+  incoming end is always a value the previous outer step already computed —
+  the proposal's energy if it was accepted, the unchanged one if it was not.
+  Both simulation and minibatch forms now carry it in their state.
+  - `amagold_tracked(u_fn, grad_u, ...) -> (init, step)` is a new additive
+    entry point; `step(key, state) -> (state, accepted)` with
+    `state.energy == u_fn(state.position)` as an invariant. `amagold` itself
+    is untouched, so `test_vendored_equivalence` still pins the vendored
+    numerics.
+  - `amagold_minibatch`: **breaking.** `init` now takes `energy_fn`
+    (`init(key, position, energy_fn)`) and `AmagoldState` gains an `energy`
+    field. Only in-tree caller (samplax-gauntlet `mnist_amagold`) updated.
+  - Both refactored onto a shared `_make_trajectory`, so the leapfrog
+    arithmetic and PRNG consumption order are identical across forms. Chains
+    are bit-identical to 0.5.1 — verified against a verbatim copy of the old
+    code, max difference exactly 0.
+  - Only valid because AMAGOLD's energy cannot drift between steps, which the
+    M-H test already requires; the `correction=None` guard in the ift-sde
+    driver enforces it. Do not use these forms with a tempered or
+    moving-log-Z potential.
+  - Measured: **1.52x** on the gauntlet `mnist_amagold` cell (784-500-256-10
+    on 60k MNIST, batch 2000, T=10 — the two full-data passes outweighed all
+    nine minibatch gradient steps). On ift-sde-shaped targets the win is
+    small and shrinks with trajectory length: 1.10x at `nstep=1`, 1.03x at
+    `nstep=5`, 1.02x at `nstep=50`, nothing by `nstep=300`, because there the
+    gradient is also full-data and dominates.
+- `amagold(..., mh=False)` no longer computes the incoming energy, which
+  nothing consumed.
+
+### Fixed
+
+- `integrations.ift_sde` `_run_amagold` recorded the trace `log_posterior`
+  with a third full evaluation per step; it is now read off the kernel state.
+
+### Added
+
+- **12 new tests** (`tests/test_amagold_tracked.py`, 74 total): bit-identity
+  against `amagold` in scalar and diagonal-mass-matrix form, the
+  `state.energy == u_fn(state.position)` invariant across both M-H branches,
+  energy-evaluation counts, scan-carry stability, and adapter-level checks
+  that the recorded log-posterior is the true one and that `final_state`
+  is the final position.
+
+### Known issue (pre-existing)
+
+- `test_vendored_equivalence.test_amagold_matches_amagold_jax` compares at
+  `rtol=1e-7`, below float32 epsilon. It passes in a full-suite run only
+  because another test module enables x64 globally at import; run on its own
+  (the invocation in its own docstring) it fails on a 1-ulp float32
+  difference against `amagold-jax`. Unrelated to the above — reproduced at
+  0.5.1.
+
 ## [0.5.0] — 2026-08-05
 
 ### Added

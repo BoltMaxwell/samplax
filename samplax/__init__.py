@@ -16,7 +16,9 @@ Core protocol: ``kernel = samplax.sgld(...)``; ``state = kernel.init(key, x)``;
 from . import schedules
 from .base import Kernel, gaussian_like
 from .gibbs import gibbs_precision
-from .kernels.amagold import amagold, amagold_minibatch
+from .kernels.amagold import (
+    AmagoldTrackedState, amagold, amagold_minibatch, amagold_tracked,
+)
 from .kernels.hmc import hmc
 from .kernels.sghmc import SGHMCState, sghmc
 from .kernels.sgld import SGLDState, sgld
@@ -25,12 +27,13 @@ from .schedules import ScheduleState, constant, cyclical, exponential, polynomia
 from .transforms import quant, vc
 from .transforms.lp_sgld import LPKernel, lp_sgld
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 __all__ = [
     "Kernel", "gaussian_like",
     "sgld", "SGLDState", "sghmc", "SGHMCState",
     "hmc", "amagold", "amagold_minibatch",
+    "amagold_tracked", "AmagoldTrackedState",
     "lp_sgld", "LPKernel", "quant", "vc",
     "Preconditioner", "identity", "rmsprop",
     "schedules", "ScheduleState", "constant", "cyclical", "exponential", "polynomial",
