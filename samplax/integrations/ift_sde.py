@@ -192,8 +192,32 @@ def _assemble_samples(kept, cfg, d_w, d_theta, d_x0, d_z):
 def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
                config: Optional[SGMCMCConfig] = None,
                log_prior_fn: Optional[Callable] = None,
-               correction: Optional[Correction] = None) -> SGMCMCResult:
+               correction: Optional[Correction] = None,
+               stochastic_grad_fn: Optional[Callable] = None) -> SGMCMCResult:
+    """Sample the relaxed joint posterior with a samplax kernel.
+
+    ``stochastic_grad_fn(key, z) -> (d_z,)`` (AMAGOLD only, optional) replaces
+    the full gradient *inside the leapfrog* with a caller-supplied stochastic
+    estimate — a minibatch of observations, a random subset of collocation
+    nodes, fresh Monte-Carlo collocation times. Same sign convention as
+    ``jax.grad(log_posterior)`` (ASCENT on the log posterior); the adapter
+    negates it for the kernel's potential. The M-H test is untouched: it still
+    uses the full ``log_posterior``, which is what makes the chain exact
+    regardless of how noisy — or even how biased — the estimate is
+    (AMAGOLD, Zhang, Cooper & De Sa 2020, Thm 1: the amortized correction
+    ``rho`` accumulates the work done by the gradients actually used, and the
+    i.i.d. per-step draw makes the reversed trajectory equally likely).
+
+    Leaving it ``None`` is exactly the previous behaviour, and passing a full
+    gradient through it reproduces the same chain bit for bit
+    (``tests/test_amagold_stochastic_grad.py``).
+    """
     cfg = config or SGMCMCConfig()
+    if stochastic_grad_fn is not None and cfg.kernel != "amagold":
+        raise ValueError(
+            f"stochastic_grad_fn is AMAGOLD-only (kernel={cfg.kernel!r}): the "
+            "SGLD/SGHMC/pCN paths have no M-H test on the full energy to "
+            "correct the minibatch noise")
     if cfg.iterations % cfg.thinning != 0:
         raise ValueError(
             f"iterations ({cfg.iterations}) must be divisible by thinning "
@@ -226,7 +250,8 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
 
     if cfg.kernel == "amagold":
         return _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z,
-                            init_mean, log_posterior, grad_fn, correction)
+                            init_mean, log_posterior, grad_fn, correction,
+                            stochastic_grad_fn)
 
     if cfg.kernel == "pcn-gibbs":
         return _run_pcn_gibbs(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
@@ -324,7 +349,7 @@ def run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
 
 
 def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
-                  log_posterior, grad_fn, correction):
+                  log_posterior, grad_fn, correction, stochastic_grad_fn=None):
     """AMAGOLD driver: a separate scan/keep-mask path, not a per-step Kernel.
 
     AMAGOLD owns its own leapfrog loop and an amortized M-H test, so it has
@@ -359,8 +384,15 @@ def _run_amagold(rng_key, cfg, d_w, d_theta, d_x0, d_z, init_mean,
     def u_fn(z):
         return -log_posterior(z)
 
-    def grad_u(key, z):
-        return _sanitize_grad(-grad_fn(z), cfg.grad_clip)
+    if stochastic_grad_fn is None:
+        def grad_u(key, z):
+            return _sanitize_grad(-grad_fn(z), cfg.grad_clip)
+    else:
+        # The leapfrog's per-step key becomes the minibatch draw. u_fn above is
+        # untouched (full energy), so the M-H test still corrects to the exact
+        # target -- the whole point of AMAGOLD.
+        def grad_u(key, z):
+            return _sanitize_grad(-stochastic_grad_fn(key, z), cfg.grad_clip)
 
     if cfg.amagold_dt_theta is not None or cfg.amagold_dt_x0 is not None:
         dt_theta = cfg.amagold_dt_theta if cfg.amagold_dt_theta is not None else cfg.amagold_dt
