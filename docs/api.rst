@@ -51,9 +51,3 @@ Hyperpriors
 
 .. automodule:: samplax.gibbs
    :members:
-
-Integrations
-------------
-
-.. automodule:: samplax.integrations.ift_sde
-   :members:

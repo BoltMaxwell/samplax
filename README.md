@@ -18,8 +18,13 @@ This is a personal, curated sampling book — provenance over coverage.
 | low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 |
 | Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
 
-Integrations
-------------
+Integrations (internal)
+-----------------------
+
+> [!WARNING]
+> `samplax.integrations` is **internal and unstable**. It is glue for one
+> downstream research codebase, not part of the samplax API, and it will be
+> moved out of this package before 1.0.0. Do not build on it.
 
 The `samplax.integrations` package holds adapter and composition code of ift-sde origin, not vendored-kernel provenance classes. Currently: `ift_sde` (engine adapter for the ift-sde `run_sgmcmc` sampler seam, with a stateful `Correction` protocol; also supports `kernel="amagold"` for M-H-corrected AMAGOLD simulation with unbiased sampling at large step sizes, composed with `correction=None` only); `nested` (persistent-PCD ∇log Z correction with optional re-warm policy, Tieleman 2008 framing).
 
@@ -74,10 +79,10 @@ first field is `position`; `temperature=0` disables noise (exploration
 phases / the optimization limit). AMAGOLD and low-precision SGLD have richer,
 documented interfaces (energy callbacks / quantization-grid conventions).
 
-ift-sde integration
--------------------
+ift-sde integration (internal)
+------------------------------
 
-`samplax.integrations.ift_sde` implements both of ift-sde's sampler seams:
+Internal and unstable — see the warning above. `samplax.integrations.ift_sde` implements both of ift-sde's sampler seams:
 
 - `run_sgmcmc(rng_key, *, d_w, d_theta, d_x0, log_likelihood_fn, energy_fn,
   config)` — the Family-B engine signature (same as `run_nsvi`/`run_npsgld`),

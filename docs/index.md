@@ -9,6 +9,5 @@ that original, and bit-equivalence-tested against the port.
 
 quickstart
 design
-ift_sde
 api
 ```

@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] — 2026-10-04
+
+### Added
+
+- **`integrations.ift_sde.run_sgmcmc(..., stochastic_grad_fn=None)`** —
+  AMAGOLD only. `stochastic_grad_fn(key, z)` returns an ascent-gradient
+  estimate that replaces the full gradient *inside the leapfrog*; the M-H
+  test still uses the full log posterior, so the chain stays exact however
+  noisy (or biased) the estimate is. Previously the adapter's gradient
+  callback ignored its per-step key and always returned the full gradient,
+  so the minibatch leapfrog AMAGOLD exists for was never exercised through
+  this path.
+  - Default `None` reproduces the 0.6.0 chain bit for bit, as does routing a
+    full gradient through the new argument.
+  - Any other kernel raises `ValueError`: SGLD/SGHMC/pCN have no full-energy
+    M-H test to correct the minibatch noise.
+  - `tests/test_amagold_stochastic_grad.py`: bit-identity, exactness under a
+    deliberately biased gradient, a subsampled likelihood against the exact
+    linear-Gaussian posterior, and the non-AMAGOLD guard.
+
+### Changed
+
+- **`samplax.integrations` is now documented as internal and unstable**, and
+  is scheduled to move out of the package before 1.0.0. No code moved in this
+  release; imports are unchanged. It is dropped from the published docs and
+  API reference.
+- Every source-repo mention in the README provenance table is now linked.
+
+### Removed
+
+- `build/lib/` (stale build output) is no longer tracked.
+
 ## [0.6.0] — 2026-08-11
 
 ### Changed

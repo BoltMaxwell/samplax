@@ -63,6 +63,9 @@ good. samplax differs deliberately:
 
 ## Roadmap
 
+- **Before 1.0.0:** move `samplax.integrations` out of the package. It is
+  internal glue for one downstream codebase and owns a sampling loop, which
+  principle 2 says the library does not do.
 - Fisher preconditioners (diag/dense) to match ift-sde's full preconditioner
   menu.
 - Validation of `run_sgmcmc` against ift-sde's `validate_mission.py` harness.
