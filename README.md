@@ -11,12 +11,12 @@ This is a personal, curated sampling book — provenance over coverage.
 
 | method | source repo | paper |
 |---|---|---|
-| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax](https://github.com/BoltMaxwell/SGHMC-jax), [csgmcmc-jax] | Chen, Fox, Guestrin 2014 |
-| cyclical schedules (cSGLD/cSGHMC) | csgmcmc-jax | Zhang et al. 2020 |
+| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 |
+| cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 |
 | pSGLD preconditioning | (Li et al. construction, matches ift-sde) | Li et al. 2016 |
-| AMAGOLD (amortized M-H) | [amagold-jax](https://github.com/BoltMaxwell/amagold-jax) | Zhang, Cooper, De Sa 2020 |
-| low-precision SGLD (F / naive / VC) | low-precision-sgld-jax | Zhang, Wilson, De Sa 2022 |
-| Gibbs Gamma hyperpriors | SGHMC-jax (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
+| AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 |
+| low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 |
+| Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
 
 Integrations
 ------------
@@ -103,4 +103,7 @@ Docs
 pip install -e '.[docs]' && sphinx-build -b html docs docs/_build
 ```
 
+[SGHMC-jax]: https://github.com/BoltMaxwell/SGHMC-jax
 [csgmcmc-jax]: https://github.com/BoltMaxwell/csgmcmc-jax
+[amagold-jax]: https://github.com/BoltMaxwell/amagold-jax
+[low-precision-sgld-jax]: https://github.com/BoltMaxwell/low-precision-sgld-jax
