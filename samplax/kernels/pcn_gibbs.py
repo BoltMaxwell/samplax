@@ -21,7 +21,7 @@ Both moves target their exact conditionals, so the sweep composition is
 pi-invariant for ANY beta in (0, 1] and any scales — tuning affects mixing
 only, never correctness. No gradients are evaluated anywhere.
 
-Why this exists (ift-sde sampler_experimentation v5/v9): joint-trajectory
+Why this exists: joint-trajectory
 kernels (AMAGOLD, scalar or mass-matrix) fail on these targets because within
 a trajectory theta moves while w cannot follow the shifting w-conditional —
 every proposal climbs energy along the stiff cross-block direction. Blocking

@@ -1,7 +1,8 @@
 """Bit-equivalence of samplax kernels against the source repos they were
-vendored from. These tests import the sibling repos directly and are skipped
-when a sibling is not present (CI without the four repos still runs
-test_correctness.py).
+vendored from. The four repos are looked for in ``~/Documents/<repo>`` (or
+``$SAMPLAX_SOURCE_REPOS/<repo>``) and imported directly. A missing repo is reported
+as skipped, never as passed, so only a run showing ``7 passed`` proves equivalence
+(CI without the repos still runs test_correctness.py).
 
 Run:  JAX_PLATFORMS=cpu python tests/test_vendored_equivalence.py
 """
@@ -12,10 +13,11 @@ import sys
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 import samplax
 
-DOCS = os.path.expanduser("~/Documents")
+DOCS = os.environ.get("SAMPLAX_SOURCE_REPOS", os.path.expanduser("~/Documents"))
 SIBLINGS = {
     "csgmcmc": os.path.join(DOCS, "csgmcmc-jax"),
     "lpsgld": os.path.join(DOCS, "low-precision-sgld-jax"),
@@ -31,6 +33,11 @@ def _have(name):
     return os.path.isdir(SIBLINGS[name])
 
 
+def _require(name):
+    if not _have(name):
+        pytest.skip(f"{SIBLINGS[name]} not found (set SAMPLAX_SOURCE_REPOS)")
+
+
 def _tree_close(a, b, **kw):
     for x, y in zip(jax.tree_util.tree_leaves(a), jax.tree_util.tree_leaves(b)):
         np.testing.assert_allclose(np.asarray(x), np.asarray(y), **kw)
@@ -41,8 +48,7 @@ GRAD = jax.tree_util.tree_map(lambda t: 0.1 * t - 0.05, POSITION)
 
 
 def test_sgld_matches_csgmcmc():
-    if not _have("csgmcmc"):
-        print("  (skipped)"); return
+    _require("csgmcmc")
     from csgmcmc_jax.samplers import jax_backend as ref
 
     key = jax.random.key(0)
@@ -54,8 +60,7 @@ def test_sgld_matches_csgmcmc():
 
 
 def test_sghmc_matches_csgmcmc():
-    if not _have("csgmcmc"):
-        print("  (skipped)"); return
+    _require("csgmcmc")
     from csgmcmc_jax.samplers import jax_backend as ref
 
     key = jax.random.key(1)
@@ -70,8 +75,7 @@ def test_sghmc_matches_csgmcmc():
 
 
 def test_sghmc_vhat_matches_sghmc_jax():
-    if not _have("sghmc"):
-        print("  (skipped)"); return
+    _require("sghmc")
     from sghmc_jax.samplers import jax_backend as ref
 
     key = jax.random.key(2)
@@ -88,8 +92,7 @@ def test_sghmc_vhat_matches_sghmc_jax():
 
 
 def test_cyclical_schedule_matches_csgmcmc():
-    if not _have("csgmcmc"):
-        print("  (skipped)"); return
+    _require("csgmcmc")
     from csgmcmc_jax.samplers.cyclical import build_schedule as ref_build
 
     ref = ref_build(1000, 4, 0.5, 0.25)
@@ -101,8 +104,7 @@ def test_cyclical_schedule_matches_csgmcmc():
 
 
 def test_lp_sgld_matches_lpsgld():
-    if not _have("lpsgld"):
-        print("  (skipped)"); return
+    _require("lpsgld")
     from lpsgld_jax.optim_lp import make_lp_update
 
     key = jax.random.key(3)
@@ -120,8 +122,7 @@ def test_lp_sgld_matches_lpsgld():
 
 
 def test_amagold_matches_amagold_jax():
-    if not _have("amagold"):
-        print("  (skipped)"); return
+    _require("amagold")
     from amagold_jax.samplers import amagold_kernel as ref_kernel
 
     u = lambda x: 0.5 * x**2
@@ -138,8 +139,7 @@ def test_amagold_matches_amagold_jax():
 
 
 def test_hmc_matches_sghmc_jax():
-    if not _have("sghmc"):
-        print("  (skipped)"); return
+    _require("sghmc")
     from sghmc_jax.samplers import jax_backend as ref
 
     u = lambda x: 0.5 * jnp.sum(x**2)
@@ -156,5 +156,9 @@ def test_hmc_matches_sghmc_jax():
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
-            fn()
-            print(f"{name}: ok")
+            try:
+                fn()
+            except pytest.skip.Exception as e:
+                print(f"{name}: skipped ({e})")
+            else:
+                print(f"{name}: ok")

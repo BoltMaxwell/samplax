@@ -5,8 +5,8 @@ A curated stochastic-gradient MCMC library in pure JAX. Kernels are small
 `init`/`step` pairs that never own the loop, so you drive them with
 `jax.lax.scan`, a Python loop, or inside a larger outer loop. It includes
 SGLD, SGHMC, pSGLD preconditioning, cyclical schedules, AMAGOLD, and
-low-precision SGLD, each taken from a verified port of the original authors'
-code. Provenance over coverage.
+low-precision SGLD, with a stated provenance and check for every kernel.
+Provenance over coverage.
 
 Install
 -------
@@ -57,7 +57,7 @@ def body(state, inp):
 _, samples = jax.lax.scan(body, state, (jnp.arange(n), jax.random.split(k_run, n)))
 samples = samples[n // 4:]            # drop burn-in
 print("mean", samples.mean(0), "(true [1, -2])")
-print("std ", samples.std(0), "(true [1, 0.5])")   # approximate: cyclical draws are autocorrelated
+print("std ", samples.std(0), "(true [1, 0.5])")
 ```
 
 Swapping the sampler is one line: preconditioned SGHMC under a cyclical
@@ -98,6 +98,7 @@ _, (samples, keep) = jax.lax.scan(
     body, state, (jnp.arange(n), jax.random.split(k_run, n)))
 samples = samples[keep]               # keep only sampling-phase draws
 print("mean", samples.mean(0), "(true [1, -2])")
+# approximate: cyclical draws are autocorrelated
 print("std ", samples.std(0), "(true [1, 0.5])")
 ```
 
@@ -138,34 +139,39 @@ step = jax.jit(step)
 state = init(jnp.array(0.0))
 
 accepted = 0
-for _ in range(200):
+total = 0.0
+for i in range(200):
     key, k = jax.random.split(key)
     state, acc = step(k, state)
     accepted += int(acc)
+    if i >= 100:
+        total += float(state.position)   # average the second 100 steps
 
-print("position", state.position, "(posterior mean ~ 2)")
-print("energy  ", state.energy)
+mean_x = total / 100
+print("posterior mean", mean_x, "(data mean", float(data.mean()), ")")
 print("acceptance rate", accepted / 200)
 ```
 
 Provenance
 ----------
 
-Kernels fall into one of two classes: vendored from a verified port of
-the original authors' code (bit-equivalence-tested against it in
-`tests/test_vendored_equivalence.py`), or original to samplax and verified
-against closed-form targets. pCN-within-Gibbs is the only original kernel.
+SGLD, SGHMC, cyclical schedules, AMAGOLD, low-precision SGLD and the HMC reference
+are vendored from verified JAX ports of the authors' code and bit-equivalence-tested
+against them (`tests/test_vendored_equivalence.py`). pSGLD preconditioning (Li et al.'s
+RMSprop construction, checked on a Gaussian target) and the Gibbs hyperpriors (from
+SGHMC-jax, checked for shape and scale) are vendored constructions without a
+bit-equivalence test. pCN-within-Gibbs is original and checked against closed forms.
 
-| method | source repo | paper |
-|---|---|---|
-| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 |
-| cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 |
-| pSGLD preconditioning | ift-sde `psgld_sampler_fast` (private) | Li et al. 2016 |
-| AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 |
-| low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 |
-| Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
-| HMC reference | [SGHMC-jax] | Chen et al. 2014 |
-| pCN-within-Gibbs | original | Cotter et al. 2013 |
+| method | source repo | paper | check |
+|---|---|---|---|
+| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 | bit-equivalence |
+| cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 | bit-equivalence |
+| pSGLD preconditioning | ift-sde `psgld_sampler_fast` (private) | Li et al. 2016 | Gaussian target (test_correctness.py) |
+| AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 | bit-equivalence |
+| low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 | bit-equivalence |
+| Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 | shape & scale (test_correctness.py) |
+| HMC reference | [SGHMC-jax] | Chen et al. 2014 | bit-equivalence |
+| pCN-within-Gibbs | original | Cotter et al. 2013 | exactness vs closed form |
 
 How this differs
 ----------------
@@ -185,8 +191,9 @@ Tests
 JAX_PLATFORMS=cpu python -m pytest tests -q --ignore=tests/test_vendored_equivalence.py
 ```
 
-The equivalence test (`tests/test_vendored_equivalence.py`) needs the four
-source repos checked out as siblings of this one.
+The equivalence test (`tests/test_vendored_equivalence.py`) looks for the four source
+repos in `~/Documents/<repo>` or `$SAMPLAX_SOURCE_REPOS/<repo>`. Missing repos are
+reported as skipped, so a run that proves equivalence shows `7 passed` with no skips.
 
 Docs
 ----

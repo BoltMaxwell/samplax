@@ -16,8 +16,9 @@ Two forms are provided:
 - :func:`amagold_minibatch` — the BNN form: persistent momentum (negated on
   rejection), T-1 minibatch gradient steps with half position steps at both
   ends, rho accumulation, and an M-H test against a full-data energy
-  difference. ``outer(key, position, momentum, grads_batches..., energy_fn)``
-  is exposed as ``step(key, state, batches, grad_fn, energy_fn, step_size)``.
+  difference. Built with ``amagold_minibatch(T=, beta=, step_size=)``, which returns
+  ``init(key, position, energy_fn)`` and
+  ``step(key, state, grad_fn, energy_fn, batches) -> (state, accepted, rho)``.
 """
 
 from typing import NamedTuple

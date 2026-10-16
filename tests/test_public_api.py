@@ -21,16 +21,18 @@ def test_agents_md_names_every_public_module():
     root = pathlib.Path(__file__).resolve().parents[1]
     text = (root / "AGENTS.md").read_text()
     for module in ("kernels", "schedules", "preconditioners", "transforms", "gibbs", "base"):
-        assert module in text, module
-
+        assert f"samplax/{module}" in text, module
 
 
 @pytest.mark.parametrize(
     "kwargs, pattern",
     [
-        (dict(step_size=0.0, step_size_final=0.1, num_training_steps=10), r"step_size must be > 0 .*got"),
-        (dict(step_size=0.1, step_size_final=-1.0, num_training_steps=10), r"step_size_final must be > 0 .*got"),
-        (dict(step_size=0.1, step_size_final=0.01, num_training_steps=0), r"num_training_steps must be >= 1 .*got"),
+        (dict(step_size=0.0, step_size_final=0.1, num_training_steps=10),
+         r"step_size must be > 0 .*got"),
+        (dict(step_size=0.1, step_size_final=-1.0, num_training_steps=10),
+         r"step_size_final must be > 0 .*got"),
+        (dict(step_size=0.1, step_size_final=0.01, num_training_steps=0),
+         r"num_training_steps must be >= 1 .*got"),
     ],
 )
 def test_schedules_errors_name_valid_inputs(kwargs, pattern):

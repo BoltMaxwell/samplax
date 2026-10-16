@@ -6,6 +6,8 @@ authors:
   - family-names: Bolt
     given-names: Maxwell
 repository-code: https://github.com/BoltMaxwell/samplax
+version: 0.8.0
+date-released: "2026-10-16"
 preferred-citation:
   type: article
   title: "A path integral formalism for filtering and smoothing stochastic differential equations"

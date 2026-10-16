@@ -1,13 +1,18 @@
 """samplax: a curated SG-MCMC sampler library in pure JAX.
 
-Vendored kernels, from verified JAX ports of the paper authors' code:
+Vendored kernels, bit-equivalence-tested against verified JAX ports of the paper
+authors' code:
 
 - SGLD / SGHMC           csgmcmc-jax + SGHMC-jax     (Chen et al. 2014; Zhang et al. 2020)
-- pSGLD preconditioning  ift-sde psgld_sampler_fast  (Li et al. 2016)
 - AMAGOLD                amagold-jax                 (Zhang, Cooper, De Sa 2020)
 - low-precision SGLD     low-precision-sgld-jax      (Zhang, Wilson, De Sa 2022)
 - cyclical schedules     csgmcmc-jax                 (Zhang et al. 2020)
 - HMC reference          SGHMC-jax                   (Chen et al. 2014)
+
+Vendored constructions, checked against targets (no bit-equivalence test):
+
+- pSGLD preconditioning  Li et al. 2016 (RMSprop; same construction as a private ift-sde sampler)
+- Gibbs Gamma hyperpriors  SGHMC-jax (Chen et al. 2014)
 
 Original kernels, implemented here and verified against closed-form targets:
 

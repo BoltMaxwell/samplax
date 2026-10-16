@@ -8,5 +8,5 @@ notes/
 build/
 .superpowers/
 .DS_Store
-# linked git worktrees (superpowers:using-git-worktrees)
+# linked git worktrees
 .worktrees/
