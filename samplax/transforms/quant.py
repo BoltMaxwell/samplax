@@ -59,9 +59,10 @@ def _round_int(t, rounding, key):
         return jnp.round(t)
     if rounding == "stochastic":
         if key is None:
-            raise ValueError("stochastic rounding requires a random key")
+            raise ValueError("stochastic rounding requires a random key; pass key=jax.random.PRNGKey(...) "
+                "or use rounding='nearest'")
         return jnp.floor(t + jax.random.uniform(key, t.shape, dtype=t.dtype))
-    raise ValueError(f"invalid rounding {rounding!r}")
+    raise ValueError(f"invalid rounding {rounding!r}; expected one of 'nearest', 'stochastic'")
 
 
 def fixed_point_quantize(x, wl, fl, rounding="stochastic", key=None):
@@ -99,7 +100,8 @@ def float_quantize(x, exp, man, rounding="nearest", key=None):
         return jax.lax.reduce_precision(x, exponent_bits=exp, mantissa_bits=man)
     if rounding == "stochastic":
         if key is None:
-            raise ValueError("stochastic rounding requires a random key")
+            raise ValueError("stochastic rounding requires a random key; pass key=jax.random.PRNGKey(...) "
+                "or use rounding='nearest'")
         # Round-to-nearest neighbours at the target mantissa precision, then pick the
         # upper neighbour with probability set by the fractional distance. The ULP is
         # 2**(floor(log2|x|) - man).
@@ -111,7 +113,7 @@ def float_quantize(x, exp, man, rounding="nearest", key=None):
         up = jax.random.uniform(key, x.shape, dtype=x.dtype) < frac
         q = jnp.where(up, lower + ulp, lower)
         return jnp.where(ax == 0, x, q)
-    raise ValueError(f"invalid rounding {rounding!r}")
+    raise ValueError(f"invalid rounding {rounding!r}; expected one of 'nearest', 'stochastic'")
 
 
 def make_quantizer(number, rounding="stochastic"):
@@ -123,7 +125,8 @@ def make_quantizer(number, rounding="stochastic"):
         return lambda x, key=None: block_quantize(x, number.wl, rounding, key, number.dim)
     if isinstance(number, FloatingPoint):
         return lambda x, key=None: float_quantize(x, number.exp, number.man, rounding, key)
-    raise TypeError(f"unknown number format {number!r}")
+    raise TypeError(f"unknown number format {number!r}; expected an instance of FixedPoint, "
+                    "BlockFloatingPoint or FloatingPoint")
 
 
 # --- fully low-precision layers: activation (forward) + error (backward) quant ---

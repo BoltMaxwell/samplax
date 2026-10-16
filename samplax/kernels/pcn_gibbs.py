@@ -61,16 +61,16 @@ def pcn_gibbs(log_target_no_wprior, *, d_w, beta, mh_scales, n_pcn=1, n_mh=1,
     whitened OU and velocity-noise Duffing targets).
     """
     if not (0.0 < beta <= 1.0):
-        raise ValueError(f"pcn beta must be in (0, 1], got {beta}")
+        raise ValueError(f"pcn beta must be in (0, 1] (got {beta})")
     if n_pcn < 1 or n_mh < 1:
-        raise ValueError("n_pcn and n_mh must be >= 1")
+        raise ValueError(f"n_pcn and n_mh must be >= 1 (got n_pcn={n_pcn}, n_mh={n_mh})")
     mh_scales = jnp.asarray(mh_scales)
     has_rest = mh_scales.shape[0] > 0
     if scale_index is not None:
         if not has_rest or not (0 <= scale_index < mh_scales.shape[0]):
-            raise ValueError(f"scale_index {scale_index} outside the rest block")
+            raise ValueError(f"scale_index must be in [0, {mh_scales.shape[0]}) = [0, len(mh_scales)) (got {scale_index})")
         if n_scale < 1:
-            raise ValueError("n_scale must be >= 1 when scale_index is set")
+            raise ValueError(f"n_scale must be >= 1 when scale_index is set (got n_scale={n_scale})")
     root = jnp.sqrt(1.0 - beta * beta)
 
     def step(key, z):
