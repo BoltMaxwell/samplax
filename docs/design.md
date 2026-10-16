@@ -6,17 +6,21 @@
 [sgmcmcjax](https://github.com/jeremiecoullon/SGMCMCJax) already exist and are
 good. samplax differs deliberately:
 
-1. **Provenance over coverage.** Every kernel traces to a verified port of the
-   paper authors' own code — SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax,
-   amagold-jax — each of which was compared quantitatively against the
-   original implementation (matlab/Octave, numpy, C++, PyTorch) before its
-   originals were retired. The vendored copies here are bit-equivalence-tested
-   against those ports (`tests/test_vendored_equivalence.py`). A sampler
-   whose lineage we can't verify doesn't go in.
+1. **Provenance over coverage.** Kernels come in two classes. **Vendored**
+   kernels (SGLD, SGHMC, cyclical schedules, pSGLD preconditioning, AMAGOLD,
+   low-precision SGLD, Gibbs hyperpriors) are taken from JAX ports of the paper
+   authors' code (SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax,
+   amagold-jax) that were compared quantitatively against the original
+   implementations (matlab/Octave, numpy, C++, PyTorch), and are
+   bit-equivalence-tested against those ports
+   (`tests/test_vendored_equivalence.py`). **Original** kernels
+   (pCN-within-Gibbs, the HMC reference) are implemented here from the paper
+   and verified by exactness tests against closed-form targets. Nothing goes
+   in without one of those two checks.
 2. **Not a framework.** No data loaders, potential modules, solver aliases,
    or I/O collectors. You bring gradients (or log-density callbacks) and a
    pytree. Kernels never own the training loop, so they embed in outer loops
-   — the requirement that drove the design (see the ift-sde integration).
+   — the requirement that drove the design (see the ift-sde adapter).
 3. **Cross-cut composition axes.** Schedules (constant / polynomial /
    cyclical), preconditioners (identity / RMSprop-pSGLD), precision
    (quantizers + variance-corrected quantization), and M-H correction
@@ -65,6 +69,5 @@ good. samplax differs deliberately:
 
 - Fisher preconditioners (diag/dense) to match ift-sde's full preconditioner
   menu.
-- Validation of `run_sgmcmc` against ift-sde's `validate_mission.py` harness.
 - Candidates for curation: SGNHT, reSGLD — same rule: only via a verified
   port of the original code.

@@ -4,10 +4,9 @@ The exactness claim for vector dt is inherited from the scalar kernel by the
 coordinate-rescaling identity in the kernel docstring; the tests here check
 (1) the identity's degenerate case (equal-entry vector == scalar, bitwise),
 (2) end-to-end exactness on a strongly anisotropic Gaussian where a scalar-dt
-kernel at the same base step cannot mix the slow coordinate, (3) the
-integration path (amagold_dt_theta), (4) the loud preconditioner raise, and
-(5) a regression for the 2026-08 thermostat-noise-shape fix (per-coordinate
-noise, not one scalar broadcast).
+kernel at the same base step cannot mix the slow coordinate, and (3) a
+regression for the 2026-08 thermostat-noise-shape fix (per-coordinate noise,
+not one scalar broadcast).
 """
 
 import jax

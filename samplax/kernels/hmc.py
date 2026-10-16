@@ -1,7 +1,7 @@
 """Leapfrog HMC with optional Metropolis-Hastings test (a full-gradient reference).
 
-Provenance: vendored from SGHMC-jax ``samplers/jax_backend.py:hmc_kernel``
-(verified against matlab/figure1/hmc.m from the ML-SGHMC repo). Not a
+Provenance: original kernel, implemented here from Chen et al. 2014 and
+verified by exactness tests against closed-form targets. Not a
 :class:`~samplax.base.Kernel` — it needs the potential ``u_fn`` and a gradient
 *function* (evaluated at intermediate leapfrog points), not a per-step
 gradient. Useful as an exact baseline in the simulated experiments.

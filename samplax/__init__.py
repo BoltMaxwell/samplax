@@ -3,14 +3,14 @@
 Vendored kernels, from verified JAX ports of the paper authors' code:
 
 - SGLD / SGHMC          csgmcmc-jax + SGHMC-jax   (Chen et al. 2014; Zhang et al. 2020)
-- pSGLD preconditioning Li et al. 2016 (matching ift-sde's psgld)
+- pSGLD preconditioning Li et al. 2016 (Li et al. 2016)
 - AMAGOLD               amagold-jax               (Zhang, Cooper, De Sa 2020)
 - low-precision SGLD    low-precision-sgld-jax    (Zhang, Wilson, De Sa 2022)
 - cyclical schedules    csgmcmc-jax               (Zhang et al. 2020)
 
 Original kernels, implemented here and verified against closed-form targets:
 
-- pCN-within-Gibbs      Cotter et al. 2013 (preconditioned Crank–Nicolson, whitened latent + M-H parameter block)
+- pCN-within-Gibbs      Cotter et al. 2013 (pCN: whitened latent + M-H parameter block)
 - HMC reference         Chen et al. 2014 (full-gradient leapfrog + M-H; exactness baseline)
 
 Core protocol: ``kernel = samplax.sgld(...)``; ``state = kernel.init(key, x)``;
