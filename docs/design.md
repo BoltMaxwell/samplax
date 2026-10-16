@@ -8,13 +8,13 @@ good. samplax differs deliberately:
 
 1. **Provenance over coverage.** Kernels come in two classes. **Vendored**
    kernels (SGLD, SGHMC, cyclical schedules, pSGLD preconditioning, AMAGOLD,
-   low-precision SGLD, Gibbs hyperpriors) are taken from JAX ports of the paper
+   low-precision SGLD, Gibbs hyperpriors, the HMC reference) are taken from JAX ports of the paper
    authors' code (SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax,
    amagold-jax) that were compared quantitatively against the original
    implementations (matlab/Octave, numpy, C++, PyTorch), and are
    bit-equivalence-tested against those ports
    (`tests/test_vendored_equivalence.py`). **Original** kernels
-   (pCN-within-Gibbs, the HMC reference) are implemented here from the paper
+   (currently pCN-within-Gibbs) are implemented here from the paper
    and verified by exactness tests against closed-form targets. Nothing goes
    in without one of those two checks.
 2. **Not a framework.** No data loaders, potential modules, solver aliases,
