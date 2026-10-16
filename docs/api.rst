@@ -22,6 +22,9 @@ Kernels
 .. automodule:: samplax.kernels.amagold
    :members:
 
+.. automodule:: samplax.kernels.pcn_gibbs
+   :members:
+
 Preconditioners
 ---------------
 
