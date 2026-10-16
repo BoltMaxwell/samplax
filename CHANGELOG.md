@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] — 2026-10-16
+
+### Removed
+
+- **`samplax.integrations`** — the ift-sde adapter now lives outside this
+  library as `ift.samplers.samplax_adapter` in ift-sde. Replace
+  `from samplax.integrations.ift_sde import …` with
+  `from ift.samplers.samplax_adapter import …`.
+
+### Added
+
+- **`samplax.pcn_gibbs`** exported from the top level and listed in the API reference.
+- **`AGENTS.md`** (with a `CLAUDE.md` pointer) and **`CITATION.cff`**.
+- **CI**: a GitHub Actions workflow runs the test suite on Python 3.11 and 3.12.
+- **`tests/test_readme_examples.py`** executes every README code block.
+
+### Changed
+
+- **README** rewritten around runnable examples.
+- **Provenance statement** distinguishes vendored kernels (bit-equivalence-tested
+  against verified ports) from original kernels (pCN-within-Gibbs,
+  exactness-tested against closed-form targets).
+- **Error messages**: every `ValueError` names the valid inputs.
+- **`lp_sgld`** validates `variant` when the kernel is built, not inside `step`.
+- **Docs** take their version from `samplax.__version__` and build warning-free.
+
+### Not in this release
+
+- License: Apache-2.0 follows in 0.9.0 once the upstream authors have been notified.
+
 ## [0.7.0] — 2026-10-04
 
 ### Added

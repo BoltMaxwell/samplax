@@ -1,6 +1,6 @@
 [project]
 name = "samplax"
-version = "0.7.0"
+version = "0.8.0"
 description = "A curated SG-MCMC sampler library in pure JAX: kernels vendored from verified ports of the original papers' code, or implemented here and verified against closed-form targets"
 readme = "README.md"
 requires-python = ">=3.10"

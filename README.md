@@ -57,7 +57,7 @@ def body(state, inp):
 _, samples = jax.lax.scan(body, state, (jnp.arange(n), jax.random.split(k_run, n)))
 samples = samples[n // 4:]            # drop burn-in
 print("mean", samples.mean(0), "(true [1, -2])")
-print("std ", samples.std(0), "(true [1, 0.5])")
+print("std ", samples.std(0), "(true [1, 0.5])")   # approximate: cyclical draws are autocorrelated
 ```
 
 Swapping the sampler is one line: preconditioned SGHMC under a cyclical
@@ -121,7 +121,7 @@ import samplax
 key = jax.random.PRNGKey(0)
 N = 1000
 key, k_data = jax.random.split(key)
-sigma = 10.0
+sigma = 10.0   # large noise keeps dt=0.1 stable at N=1000
 data = 2.0 + sigma * jax.random.normal(k_data, (N,))   # y ~ N(2, sigma^2)
 
 def u_fn(x):
@@ -160,7 +160,7 @@ against closed-form targets. pCN-within-Gibbs is the only original kernel.
 |---|---|---|
 | SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 |
 | cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 |
-| pSGLD preconditioning | (Li et al. construction) | Li et al. 2016 |
+| pSGLD preconditioning | ift-sde `psgld_sampler_fast` (private) | Li et al. 2016 |
 | AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 |
 | low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 |
 | Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 |
