@@ -17,5 +17,4 @@ html_title = "samplax"
 
 myst_enable_extensions = ["dollarmath"]
 
-# ift_sde.md documents samplax.integrations, which is internal (see README)
-exclude_patterns = ["_build", "ift_sde.md"]
+exclude_patterns = ["_build"]

@@ -4,7 +4,7 @@ Target family: pi(z) ∝ exp(f(z)) · N(w; 0, I) with z = [w | rest], where
 ``rest`` is a small parameter block (theta, x0) whose own prior is INCLUDED in
 ``f``, and w is a high-dimensional whitened latent with an exact standard-normal
 prior. This is precisely the structure of the whitened IFT targets
-(``samplax.integrations.ift_sde``: log_likelihood + theta/x0 priors in f;
+(w ~ N(0, I) latent, small parameter block: log_likelihood + theta/x0 priors in f;
 energy = ||w||^2/2 is the w prior).
 
 Two alternating exact conditional M-H moves per sweep:

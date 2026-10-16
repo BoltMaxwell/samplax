@@ -12,7 +12,7 @@ Every gradient-driven kernel in samplax is a :class:`Kernel`:
   optimization counterpart — used by cyclical exploration phases).
 
 Kernels never own the loop: drive them with ``lax.scan``, a Python loop, or
-from inside an outer sampler (see ``samplax.integrations``). Samplers that
+from inside an outer driver such as the ift-sde adapter. Samplers that
 need more than a per-step gradient (AMAGOLD's amortized Metropolis-Hastings
 correction needs energy evaluations) define their own richer protocol in
 their module and are not :class:`Kernel` instances.

@@ -13,12 +13,10 @@ noise, not one scalar broadcast).
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 jax.config.update("jax_enable_x64", True)
 
 from samplax.kernels.amagold import amagold
-from samplax.integrations import ift_sde
 
 
 def _run_chain(step, key, x0, n):
@@ -88,44 +86,6 @@ def test_vector_dt_exact_on_anisotropic_gaussian():
     ac_sc = lag_autocorr(xs_sc[:, 1], 20)
     assert ac_sc > 0.9, ac_sc
     assert ac_vec < 0.5, ac_vec
-
-
-def test_dt_blocks_through_integration():
-    """theta target = its prior N(0, 10^2); w target = N(0, 1) likelihood.
-    Per-block dts must recover both scales."""
-    d_w, d_theta, d_x0 = 2, 1, 0
-    scale = 10.0
-
-    def loglik(w, theta, x0):
-        return -0.5 * jnp.sum(w**2)
-
-    cfg = ift_sde.SGMCMCConfig(
-        kernel="amagold", schedule="constant", preconditioner="identity",
-        amagold_dt=0.3, amagold_dt_theta=0.3 * scale, amagold_C=1.0,
-        amagold_nstep=5, theta_prior_std=scale,
-        iterations=30_000, burn_in=10_000, thinning=10, chains=4,
-    )
-    res = ift_sde.run_sgmcmc(jax.random.key(3), d_w=d_w, d_theta=d_theta,
-                             d_x0=d_x0, log_likelihood_fn=loglik,
-                             energy_fn=lambda w, t, x: 0.0, config=cfg)
-    w = res.samples["w_samples"].reshape(-1, d_w)
-    th = res.samples["theta_samples"].reshape(-1, d_theta)
-    assert np.all(np.isfinite(w)) and np.all(np.isfinite(th))
-    assert np.all(np.abs(w.std(axis=0) - 1.0) < 0.15)
-    assert abs(th.std() - scale) < 0.2 * scale
-    accept = float(np.mean(res.final_state["accept_rate"]))
-    assert 0.15 <= accept <= 1.0
-
-
-def test_amagold_preconditioner_raises_loudly():
-    cfg = ift_sde.SGMCMCConfig(
-        kernel="amagold", schedule="constant", preconditioner="rmsprop",
-        amagold_dt=0.1, iterations=100, burn_in=0, thinning=10, chains=1,
-    )
-    with pytest.raises(ValueError, match="amagold has no preconditioner"):
-        ift_sde.run_sgmcmc(jax.random.key(0), d_w=2, d_theta=0, d_x0=0,
-                           log_likelihood_fn=lambda w, t, x: -0.5 * jnp.sum(w**2),
-                           energy_fn=lambda w, t, x: 0.0, config=cfg)
 
 
 def test_thermostat_noise_is_per_coordinate():
