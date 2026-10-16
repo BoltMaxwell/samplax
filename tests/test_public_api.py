@@ -1,4 +1,8 @@
+import jax.numpy as jnp
+import pytest
+
 import samplax
+from samplax.transforms import quant
 
 
 def test_every_kernel_module_is_exported():
@@ -19,9 +23,6 @@ def test_agents_md_names_every_public_module():
     for module in ("kernels", "schedules", "preconditioners", "transforms", "gibbs", "base"):
         assert module in text, module
 
-
-import jax
-import pytest
 
 
 @pytest.mark.parametrize(
@@ -71,18 +72,26 @@ def test_lp_sgld_errors_name_valid_inputs(args, kwargs, pattern):
         lp_sgld(*args, datasize=10, **kwargs)
 
 
-def test_quant_errors_name_valid_inputs():
-    import jax.numpy as jnp
-    from samplax.transforms import quant
+_X = jnp.ones(3)
+_KEY_RE = r"key=jax\.random\.PRNGKey"
+_ROUND_RE = "expected one of 'nearest', 'stochastic'"
 
-    x = jnp.ones(3)
-    with pytest.raises(ValueError, match=r"key=jax\.random\.PRNGKey"):
-        quant._round_int(x, "stochastic", None)
-    with pytest.raises(ValueError, match=r"key=jax\.random\.PRNGKey"):
-        quant.float_quantize(x, 5, 2, "stochastic", None)
-    with pytest.raises(ValueError, match="expected one of 'nearest', 'stochastic'"):
-        quant._round_int(x, "xyz", None)
-    with pytest.raises(ValueError, match="expected one of 'nearest', 'stochastic'"):
-        quant.float_quantize(x, 5, 2, "xyz")
-    with pytest.raises(TypeError, match="expected an instance of FixedPoint"):
-        quant.make_quantizer("fixed")
+
+@pytest.mark.parametrize(
+    "fn, exc, pattern",
+    [
+        (lambda: quant._round_int(_X, "stochastic", None), ValueError, _KEY_RE),
+        (lambda: quant.float_quantize(_X, 5, 2, "stochastic", None), ValueError, _KEY_RE),
+        (lambda: quant.fixed_point_quantize(_X, 8, 4, "stochastic"), ValueError, _KEY_RE),
+        (lambda: quant.make_quantizer(quant.FixedPoint(8, 4), "stochastic")(_X),
+         ValueError, _KEY_RE),
+        (lambda: quant._round_int(_X, "xyz", None), ValueError, _ROUND_RE),
+        (lambda: quant.float_quantize(_X, 5, 2, "xyz"), ValueError, _ROUND_RE),
+        (lambda: quant.make_quantizer("fixed"), TypeError, "expected an instance of FixedPoint"),
+    ],
+    ids=["round_int-nokey", "float-nokey", "fixed_point-nokey", "make_quantizer-nokey",
+         "round_int-invalid", "float-invalid", "make_quantizer-bad-format"],
+)
+def test_quant_errors_name_valid_inputs(fn, exc, pattern):
+    with pytest.raises(exc, match=pattern):
+        fn()

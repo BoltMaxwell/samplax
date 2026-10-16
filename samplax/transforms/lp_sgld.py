@@ -101,9 +101,9 @@ def lp_sgld(variant, wl, fl, *, datasize, weight_decay=0.0, number="fixed"):
             stepped = jax.tree_util.tree_map(lambda p, n: p + n, stepped, gn)
             out = stepped if variant == "sgldlp_f" else _tree_map_keyed(quant, stepped, kw)
             return LPSGLDState(out)
-        if variant == "vc":
-            mu = jax.tree_util.tree_map(gd, params, qgrads)
-            return LPSGLDState(
-                _tree_map_keyed(lambda x, k: vc_quant(k, x, var), mu, kw))
+        # variant validated at build time; "vc" is the only remaining case
+        mu = jax.tree_util.tree_map(gd, params, qgrads)
+        return LPSGLDState(
+            _tree_map_keyed(lambda x, k: vc_quant(k, x, var), mu, kw))
 
     return LPKernel(init, step, forward_quant)

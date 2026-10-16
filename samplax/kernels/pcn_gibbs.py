@@ -68,9 +68,11 @@ def pcn_gibbs(log_target_no_wprior, *, d_w, beta, mh_scales, n_pcn=1, n_mh=1,
     has_rest = mh_scales.shape[0] > 0
     if scale_index is not None:
         if not has_rest or not (0 <= scale_index < mh_scales.shape[0]):
-            raise ValueError(f"scale_index must be in [0, {mh_scales.shape[0]}) = [0, len(mh_scales)) (got {scale_index})")
+            raise ValueError(
+                f"scale_index must be in [0, {mh_scales.shape[0]}) (got {scale_index})")
         if n_scale < 1:
-            raise ValueError(f"n_scale must be >= 1 when scale_index is set (got n_scale={n_scale})")
+            raise ValueError(
+                f"n_scale must be >= 1 when scale_index is set (got n_scale={n_scale})")
     root = jnp.sqrt(1.0 - beta * beta)
 
     def step(key, z):

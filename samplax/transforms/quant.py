@@ -59,8 +59,9 @@ def _round_int(t, rounding, key):
         return jnp.round(t)
     if rounding == "stochastic":
         if key is None:
-            raise ValueError("stochastic rounding requires a random key; pass key=jax.random.PRNGKey(...) "
-                "or use rounding='nearest'")
+            raise ValueError(
+                "stochastic rounding requires a random key; "
+                "pass key=jax.random.PRNGKey(...) or use rounding='nearest'")
         return jnp.floor(t + jax.random.uniform(key, t.shape, dtype=t.dtype))
     raise ValueError(f"invalid rounding {rounding!r}; expected one of 'nearest', 'stochastic'")
 
@@ -100,8 +101,9 @@ def float_quantize(x, exp, man, rounding="nearest", key=None):
         return jax.lax.reduce_precision(x, exponent_bits=exp, mantissa_bits=man)
     if rounding == "stochastic":
         if key is None:
-            raise ValueError("stochastic rounding requires a random key; pass key=jax.random.PRNGKey(...) "
-                "or use rounding='nearest'")
+            raise ValueError(
+                "stochastic rounding requires a random key; "
+                "pass key=jax.random.PRNGKey(...) or use rounding='nearest'")
         # Round-to-nearest neighbours at the target mantissa precision, then pick the
         # upper neighbour with probability set by the fractional distance. The ULP is
         # 2**(floor(log2|x|) - man).
