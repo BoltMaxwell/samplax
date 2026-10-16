@@ -50,7 +50,7 @@ def pcn_gibbs(log_target_no_wprior, *, d_w, beta, mh_scales, n_pcn=1, n_mh=1,
         eps ~ N(0, scale_step^2);  w' = w e^{-eps};  rest[i]' = rest[i] + eps
 
     with log-acceptance ``f(z') - f(z) - (e^{-2 eps} - 1) ||w||^2 / 2
-    - d_w eps`` (w-prior ratio + the |det| = e^{-d_w eps} Jacobian of the
+    - d_w eps`` (w-prior ratio + the ``|det| = e^{-d_w eps}`` Jacobian of the
     deterministic map). It is a valid M-H move for ANY target; its power is on
     whitened amplitude ridges, where the likelihood depends on w only through
     ``exp(rest[i]) * (linear map of w)`` and is therefore EXACTLY invariant
