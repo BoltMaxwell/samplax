@@ -156,21 +156,21 @@ Provenance
 ----------
 
 SGLD, SGHMC, cyclical schedules, AMAGOLD, low-precision SGLD and the HMC reference
-are vendored from verified JAX ports of the authors' code and bit-equivalence-tested
+are vendored from verified JAX ports of the authors' code and equivalence-tested
 against them (`tests/test_vendored_equivalence.py`). pSGLD preconditioning (Li et al.'s
 RMSprop construction, checked on a Gaussian target) and the Gibbs hyperpriors (from
 SGHMC-jax, checked for shape and scale) are vendored constructions without a
-bit-equivalence test. pCN-within-Gibbs is original and checked against closed forms.
+equivalence test. pCN-within-Gibbs is original and checked against closed forms.
 
 | method | source repo | paper | check |
 |---|---|---|---|
-| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 | bit-equivalence |
-| cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 | bit-equivalence |
+| SGLD, SGHMC (+ v_hat noise correction) | [SGHMC-jax], [csgmcmc-jax] | Chen, Fox, Guestrin 2014 | equivalence, rtol 1e-7 |
+| cyclical schedules (cSGLD/cSGHMC) | [csgmcmc-jax] | Zhang et al. 2020 | equivalence, rtol 1e-7 |
 | pSGLD preconditioning | ift-sde `psgld_sampler_fast` (private) | Li et al. 2016 | Gaussian target (test_correctness.py) |
-| AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 | bit-equivalence |
-| low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 | bit-equivalence |
+| AMAGOLD (amortized M-H) | [amagold-jax] | Zhang, Cooper, De Sa 2020 | equivalence, rtol 1e-7 |
+| low-precision SGLD (F / naive / VC) | [low-precision-sgld-jax] | Zhang, Wilson, De Sa 2022 | equivalence, rtol 1e-7 |
 | Gibbs Gamma hyperpriors | [SGHMC-jax] (ML-SGHMC bayesnn/mf) | Chen et al. 2014 | shape & scale (test_correctness.py) |
-| HMC reference | [SGHMC-jax] | Chen et al. 2014 | bit-equivalence |
+| HMC reference | [SGHMC-jax] | Chen et al. 2014 | equivalence, rtol 1e-7 |
 | pCN-within-Gibbs | original | Cotter et al. 2013 | exactness vs closed form |
 
 How this differs
@@ -191,9 +191,12 @@ Tests
 JAX_PLATFORMS=cpu python -m pytest tests -q --ignore=tests/test_vendored_equivalence.py
 ```
 
-The equivalence test (`tests/test_vendored_equivalence.py`) looks for the four source
-repos in `~/Documents/<repo>` or `$SAMPLAX_SOURCE_REPOS/<repo>`. Missing repos are
-reported as skipped, so a run that proves equivalence shows `7 passed` with no skips.
+The equivalence test (`tests/test_vendored_equivalence.py`) looks for the four
+source repos in `~/Documents/<repo>` or `$SAMPLAX_SOURCE_REPOS/<repo>`. Missing
+repos are reported as skipped, so a run that proves equivalence shows `7 passed`
+with no skips. The file enables float64 itself and asserts agreement to rtol
+1e-7; in float32 the AMAGOLD chain differs from amagold-jax by one ulp
+(operation order).
 
 Docs
 ----

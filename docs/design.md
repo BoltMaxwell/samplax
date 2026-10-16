@@ -10,9 +10,9 @@ good. samplax differs deliberately:
    AMAGOLD, low-precision SGLD, the HMC reference) are taken from JAX ports of the paper
    authors' code (SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax, amagold-jax) that were
    compared quantitatively against the original implementations (matlab/Octave, numpy,
-   C++, PyTorch), and are bit-equivalence-tested against those ports
+   C++, PyTorch), and are equivalence-tested against those ports
    (`tests/test_vendored_equivalence.py`). pSGLD preconditioning and the Gibbs
-   hyperpriors are vendored constructions without a bit-equivalence test: pSGLD follows
+   hyperpriors are vendored constructions without a equivalence test: pSGLD follows
    Li et al.'s RMSprop construction and is checked on a Gaussian target; the Gibbs
    hyperpriors come from SGHMC-jax and are checked for shape and scale. **Original**
    kernels (currently pCN-within-Gibbs) are implemented here from the paper and verified

@@ -31,7 +31,7 @@ Defined in `samplax/base.py`:
 
 `JAX_PLATFORMS=cpu python -m pytest tests -q --ignore=tests/test_vendored_equivalence.py`
 
-`tests/test_vendored_equivalence.py` looks for SGHMC-jax, csgmcmc-jax, amagold-jax and low-precision-sgld-jax in `~/Documents/<repo>` or `$SAMPLAX_SOURCE_REPOS/<repo>`; missing repos are reported as skipped, so a run that proves equivalence shows `7 passed` with no skips.
+`tests/test_vendored_equivalence.py` looks for SGHMC-jax, csgmcmc-jax, amagold-jax and low-precision-sgld-jax in `~/Documents/<repo>` or `$SAMPLAX_SOURCE_REPOS/<repo>`; missing repos are reported as skipped, so a run that proves equivalence shows `7 passed` with no skips. The file enables float64 itself and asserts agreement to rtol 1e-7; in float32 the AMAGOLD chain differs from amagold-jax by one ulp (operation order).
 
 ## Where things are
 
@@ -45,4 +45,4 @@ Defined in `samplax/base.py`:
 ## What not to do
 
 - Do not add loop-owning drivers; the library provides steps, callers loop.
-- Do not add a kernel without a verified source: either vendored from a verified JAX port of the authors' code and bit-equivalence-tested against it, or an exact construction from the paper checked against a known target, or original and verified by exactness tests against closed-form targets.
+- Do not add a kernel without a verified source: either vendored from a verified JAX port of the authors' code and equivalence-tested against it, or an exact construction from the paper checked against a known target, or original and verified by exactness tests against closed-form targets.

@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **README** rewritten around runnable examples.
-- **Provenance statement** distinguishes vendored kernels (bit-equivalence-tested
+- **Provenance statement** distinguishes vendored kernels (equivalence-tested
   against verified ports) from original kernels (pCN-within-Gibbs,
   exactness-tested against closed-form targets).
 - **Error messages**: every `ValueError` names the valid inputs.
@@ -31,6 +31,8 @@ All notable changes to this project will be documented in this file.
 - **Docs** take their version from `samplax.__version__` and build warning-free.
 - **`tests/test_vendored_equivalence.py`** reports missing source repos as skipped
   instead of passing silently.
+  It also enables float64 itself, so a standalone run matches the full suite
+  (in float32 the AMAGOLD comparison fails by one ulp).
 
 ### Not in this release
 

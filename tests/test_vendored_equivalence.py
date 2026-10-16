@@ -1,8 +1,9 @@
-"""Bit-equivalence of samplax kernels against the source repos they were
+"""Equivalence of samplax kernels against the source repos they were
 vendored from. The four repos are looked for in ``~/Documents/<repo>`` (or
-``$SAMPLAX_SOURCE_REPOS/<repo>``) and imported directly. A missing repo is reported
-as skipped, never as passed, so only a run showing ``7 passed`` proves equivalence
-(CI without the repos still runs test_correctness.py).
+``$SAMPLAX_SOURCE_REPOS/<repo>``) and imported directly; comparisons run in
+float64 at rtol 1e-7. A missing repo is reported as skipped, never as passed,
+so only a run showing ``7 passed`` proves equivalence (CI without the repos
+still runs test_correctness.py).
 
 Run:  JAX_PLATFORMS=cpu python tests/test_vendored_equivalence.py
 """
@@ -16,6 +17,10 @@ import numpy as np
 import pytest
 
 import samplax
+
+# Compare in float64, as the rest of the suite does. In float32 the AMAGOLD chain
+# differs from amagold-jax by one ulp (operation order), which rtol=1e-7 rejects.
+jax.config.update("jax_enable_x64", True)
 
 DOCS = os.environ.get("SAMPLAX_SOURCE_REPOS", os.path.expanduser("~/Documents"))
 SIBLINGS = {
