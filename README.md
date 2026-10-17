@@ -206,10 +206,38 @@ pip install -e '.[docs]'
 sphinx-build -b html docs docs/_build
 ```
 
+License
+-------
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). The vendored
+kernels come from the JAX ports linked under Provenance, which are released under
+the same license; the original authors' repositories carry no license of their
+own, and the ports were released with the authors' knowledge (and, for Ruqi
+Zhang's code, agreement). `NOTICE` credits each kernel's upstream code and paper.
+
 Cite
 ----
 
-See `CITATION.cff`.
+If you use samplax, please cite the paper it was written for and the papers
+behind the kernels you use. All of them, with full publisher metadata, are in
+[`CITATION.cff`](CITATION.cff).
+
+```bibtex
+@unpublished{alberts2026pathintegral,
+  title  = {A path integral formalism for filtering and smoothing stochastic
+            differential equations},
+  author = {Alberts, Alex and Bolt, Maxwell and Bilionis, Ilias},
+  year   = {2026},
+  note   = {Alberts and Bolt contributed equally. Preprint; venue to be announced.}
+}
+```
+
+Method papers by kernel: SGLD, Welling and Teh (ICML 2011); SGHMC, the HMC
+reference and the Gibbs hyperpriors, Chen, Fox and Guestrin (ICML 2014); cyclical
+schedules, Zhang, Li, Zhang, Chen and Wilson (ICLR 2020); pSGLD preconditioning,
+Li, Chen, Carlson and Carin (AAAI 2016); AMAGOLD, Zhang, Cooper and De Sa
+(AISTATS 2020); low-precision SGLD, Zhang, Wilson and De Sa (ICML 2022); pCN,
+Cotter, Roberts, Stuart and White (Statistical Science, 2013).
 
 [SGHMC-jax]: https://github.com/BoltMaxwell/SGHMC-jax
 [csgmcmc-jax]: https://github.com/BoltMaxwell/csgmcmc-jax

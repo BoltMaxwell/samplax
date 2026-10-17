@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] — unreleased
+
+### Added
+
+- **License**: Apache-2.0 (`LICENSE`, `NOTICE`, license metadata in `pyproject.toml`).
+  The vendored kernels come from JAX ports released under the same license; their
+  upstream repositories carry no license of their own and the ports were released
+  with the upstream authors' knowledge (and, for Ruqi Zhang's code, agreement).
+- **Citations**: `CITATION.cff` names the paper samplax was written for (Alberts,
+  Bolt and Bilionis, 2026) as the preferred citation with all three authors, and
+  lists the seven method papers and the four source ports with full publisher
+  metadata. The README gains License and Cite sections, and `NOTICE` credits each
+  vendored kernel's upstream code and paper.
+
 ## [0.8.0] — 2026-10-16
 
 ### Removed

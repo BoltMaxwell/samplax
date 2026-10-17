@@ -1,17 +1,204 @@
 cff-version: 1.2.0
 title: samplax
-message: "If you use samplax, please cite the paper below."
+message: >-
+  If you use samplax, please cite the paper it was written for
+  (preferred-citation) and the papers behind the kernels you use (references).
+  The vendored kernels come from the JAX ports listed under references; their
+  upstream repositories and papers are credited in NOTICE.
 type: software
 authors:
   - family-names: Bolt
     given-names: Maxwell
+    affiliation: Purdue University
 repository-code: https://github.com/BoltMaxwell/samplax
-version: 0.8.0
-date-released: "2026-10-16"
+license: Apache-2.0
+version: 0.9.0
+date-released: "2026-10-17"
 preferred-citation:
-  type: article
+  type: unpublished
   title: "A path integral formalism for filtering and smoothing stochastic differential equations"
   authors:
+    - family-names: Alberts
+      given-names: Alex
     - family-names: Bolt
       given-names: Maxwell
-  # TODO: venue and year
+    - family-names: Bilionis
+      given-names: Ilias
+  year: 2026
+  notes: >-
+    Alberts and Bolt contributed equally. Preprint; venue to be announced, and
+    this entry will be updated when the paper appears.
+references:
+  # --- method papers, in the order the kernels appear in the README ---
+  - type: conference-paper
+    title: "Bayesian Learning via Stochastic Gradient Langevin Dynamics"
+    authors:
+      - family-names: Welling
+        given-names: Max
+      - family-names: Teh
+        given-names: Yee Whye
+    collection-title: "Proceedings of the 28th International Conference on Machine Learning (ICML-11)"
+    collection-type: proceedings
+    conference:
+      name: "ICML 2011"
+    publisher:
+      name: ACM
+    start: 681
+    end: 688
+    year: 2011
+    url: "https://icml.cc/imls/conferences/2011/papers/398_icmlpaper.pdf"
+    notes: SGLD.
+  - type: conference-paper
+    title: "Stochastic Gradient Hamiltonian Monte Carlo"
+    authors:
+      - family-names: Chen
+        given-names: Tianqi
+      - family-names: Fox
+        given-names: Emily
+      - family-names: Guestrin
+        given-names: Carlos
+    collection-title: "Proceedings of the 31st International Conference on Machine Learning"
+    collection-type: proceedings
+    conference:
+      name: "ICML 2014"
+    publisher:
+      name: PMLR
+    volume: 32
+    issue: 2
+    start: 1683
+    end: 1691
+    year: 2014
+    url: "https://proceedings.mlr.press/v32/cheni14.html"
+    notes: SGHMC, the HMC reference and the Gibbs Gamma hyperpriors (via ML-SGHMC).
+  - type: conference-paper
+    title: "Cyclical Stochastic Gradient MCMC for Bayesian Deep Learning"
+    authors:
+      - family-names: Zhang
+        given-names: Ruqi
+      - family-names: Li
+        given-names: Chunyuan
+      - family-names: Zhang
+        given-names: Jianyi
+      - family-names: Chen
+        given-names: Changyou
+      - family-names: Wilson
+        given-names: Andrew Gordon
+    collection-title: "International Conference on Learning Representations"
+    collection-type: proceedings
+    conference:
+      name: "ICLR 2020"
+    year: 2020
+    url: "https://openreview.net/forum?id=rkeS1RVtPS"
+    notes: Cyclical step-size schedules (cSGLD, cSGHMC) and the v_hat noise correction as ported.
+  - type: conference-paper
+    title: "Preconditioned Stochastic Gradient Langevin Dynamics for Deep Neural Networks"
+    authors:
+      - family-names: Li
+        given-names: Chunyuan
+      - family-names: Chen
+        given-names: Changyou
+      - family-names: Carlson
+        given-names: David
+      - family-names: Carin
+        given-names: Lawrence
+    collection-title: "Proceedings of the AAAI Conference on Artificial Intelligence"
+    collection-type: proceedings
+    conference:
+      name: "AAAI 2016"
+    volume: 30
+    issue: 1
+    start: 1788
+    end: 1794
+    year: 2016
+    doi: 10.1609/aaai.v30i1.10200
+    notes: pSGLD (RMSprop) preconditioning.
+  - type: conference-paper
+    title: "AMAGOLD: Amortized Metropolis Adjustment for Efficient Stochastic Gradient MCMC"
+    authors:
+      - family-names: Zhang
+        given-names: Ruqi
+      - family-names: Cooper
+        given-names: A. Feder
+      - family-names: De Sa
+        given-names: Christopher
+    collection-title: "Proceedings of the Twenty Third International Conference on Artificial Intelligence and Statistics"
+    collection-type: proceedings
+    conference:
+      name: "AISTATS 2020"
+    publisher:
+      name: PMLR
+    volume: 108
+    start: 2142
+    end: 2152
+    year: 2020
+    url: "https://proceedings.mlr.press/v108/zhang20e.html"
+    notes: AMAGOLD.
+  - type: conference-paper
+    title: "Low-Precision Stochastic Gradient Langevin Dynamics"
+    authors:
+      - family-names: Zhang
+        given-names: Ruqi
+      - family-names: Wilson
+        given-names: Andrew Gordon
+      - family-names: De Sa
+        given-names: Christopher
+    collection-title: "Proceedings of the 39th International Conference on Machine Learning"
+    collection-type: proceedings
+    conference:
+      name: "ICML 2022"
+    publisher:
+      name: PMLR
+    volume: 162
+    start: 26624
+    end: 26644
+    year: 2022
+    url: "https://proceedings.mlr.press/v162/zhang22ag.html"
+    notes: Low-precision SGLD (full, naive and variance-corrected).
+  - type: article
+    title: "MCMC Methods for Functions: Modifying Old Algorithms to Make Them Faster"
+    authors:
+      - family-names: Cotter
+        given-names: Simon L.
+      - family-names: Roberts
+        given-names: Gareth O.
+      - family-names: Stuart
+        given-names: Andrew M.
+      - family-names: White
+        given-names: David
+    journal: Statistical Science
+    volume: 28
+    issue: 3
+    start: 424
+    end: 446
+    year: 2013
+    doi: 10.1214/13-STS421
+    notes: pCN, used in pCN-within-Gibbs.
+  # --- the JAX ports the kernels are vendored from (each cites its upstream) ---
+  - type: software
+    title: SGHMC-jax
+    authors:
+      - family-names: Bolt
+        given-names: Maxwell
+    repository-code: https://github.com/BoltMaxwell/SGHMC-jax
+    notes: Port of tqchen/ML-SGHMC (Chen, Fox and Guestrin).
+  - type: software
+    title: csgmcmc-jax
+    authors:
+      - family-names: Bolt
+        given-names: Maxwell
+    repository-code: https://github.com/BoltMaxwell/csgmcmc-jax
+    notes: Port of ruqizhang/csgmcmc (Zhang, Li, Zhang, Chen and Wilson).
+  - type: software
+    title: amagold-jax
+    authors:
+      - family-names: Bolt
+        given-names: Maxwell
+    repository-code: https://github.com/BoltMaxwell/amagold-jax
+    notes: Port of ruqizhang/amagold (Zhang, Cooper and De Sa).
+  - type: software
+    title: low-precision-sgld-jax
+    authors:
+      - family-names: Bolt
+        given-names: Maxwell
+    repository-code: https://github.com/BoltMaxwell/low-precision-sgld-jax
+    notes: Port of ruqizhang/low-precision-sgld (Zhang, Wilson and De Sa).
