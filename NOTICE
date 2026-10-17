@@ -1,0 +1,48 @@
+samplax
+Copyright 2026 Maxwell Bolt
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
+
+samplax vendors kernels from the following JAX ports, released under the
+Apache License 2.0 by the same copyright holder, and through them from the
+original authors' code:
+
+  - SGLD, SGHMC (with the v_hat noise correction), the HMC reference and the
+    Gibbs Gamma hyperpriors: from SGHMC-jax
+    (https://github.com/BoltMaxwell/SGHMC-jax), a port of tqchen/ML-SGHMC by
+    Tianqi Chen, Emily Fox and Carlos Guestrin, "Stochastic Gradient
+    Hamiltonian Monte Carlo", ICML 2014; SGLD itself is due to Welling and
+    Teh, "Bayesian Learning via Stochastic Gradient Langevin Dynamics",
+    ICML 2011.
+  - Cyclical SG-MCMC schedules (cSGLD, cSGHMC): from csgmcmc-jax
+    (https://github.com/BoltMaxwell/csgmcmc-jax), a port of ruqizhang/csgmcmc
+    by Ruqi Zhang, Chunyuan Li, Jianyi Zhang, Changyou Chen and Andrew Gordon
+    Wilson, "Cyclical Stochastic Gradient MCMC for Bayesian Deep Learning",
+    ICLR 2020.
+  - AMAGOLD: from amagold-jax (https://github.com/BoltMaxwell/amagold-jax), a
+    port of ruqizhang/amagold by Ruqi Zhang, A. Feder Cooper and Christopher
+    De Sa, "AMAGOLD: Amortized Metropolis Adjustment for Efficient Stochastic
+    Gradient MCMC", AISTATS 2020.
+  - Low-precision SGLD (full, naive and variance-corrected): from
+    low-precision-sgld-jax (https://github.com/BoltMaxwell/low-precision-sgld-jax),
+    a port of ruqizhang/low-precision-sgld by Ruqi Zhang, Andrew Gordon Wilson
+    and Christopher De Sa, "Low-Precision Stochastic Gradient Langevin
+    Dynamics", ICML 2022.
+
+The original authors' repositories carry no license of their own. The ports
+of Ruqi Zhang's code are released with the knowledge and agreement of the
+authors (October 2026); the authors of ML-SGHMC were notified before release.
+The methods, and the experimental designs they were verified against, belong
+to their authors.
+
+Two further constructions are implemented in samplax rather than vendored:
+pSGLD preconditioning follows Li, Chen, Carlson and Carin, "Preconditioned
+Stochastic Gradient Langevin Dynamics for Deep Neural Networks", AAAI 2016;
+pCN-within-Gibbs follows Cotter, Roberts, Stuart and White, "MCMC Methods for
+Functions: Modifying Old Algorithms to Make Them Faster", Statistical Science
+28(3), 2013.
+
+samplax was written with the assistance of Claude Code (Anthropic) for
+Alberts, Bolt and Bilionis, "A path integral formalism for filtering and
+smoothing stochastic differential equations" (2026). Full citation metadata
+for the paper, the method papers and the source ports is in CITATION.cff.
