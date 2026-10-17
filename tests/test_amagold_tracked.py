@@ -14,12 +14,10 @@ bit-identical. That is the first and most important test here.
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 jax.config.update("jax_enable_x64", True)
 
 import samplax
-from samplax.integrations import ift_sde
 
 U_FN = lambda x: 0.5 * jnp.sum(x**2)
 GRAD_U = lambda key, x: x + 0.1 * jax.random.normal(key, jnp.shape(x))
@@ -189,74 +187,3 @@ def test_minibatch_state_is_a_stable_scan_carry():
     assert accepts.shape == (20,)
     np.testing.assert_allclose(float(state.energy), float(energy_fn(state.position)),
                                rtol=1e-12)
-
-
-# --- the ift-sde driver, which is where the third evaluation lived ------------
-
-
-def _problem():
-    def log_likelihood_fn(w, theta, x0):
-        return -0.5 * jnp.sum((w - 0.4) ** 2) + 0.0 * theta[0] + 0.0 * x0[0]
-
-    def energy_fn(w, theta, x0):
-        return 0.5 * jnp.sum(w**2)
-
-    return log_likelihood_fn, energy_fn
-
-
-def _config(**kw):
-    base = dict(kernel="amagold", schedule="constant", preconditioner="identity",
-                amagold_dt=0.05, amagold_nstep=4, amagold_C=1.0,
-                iterations=200, burn_in=0, thinning=50, chains=2,
-                x0_prior_std=1.0)
-    base.update(kw)
-    return ift_sde.SGMCMCConfig(**base)
-
-
-def _run(cfg, seed=0):
-    loglik, energy = _problem()
-    return ift_sde.run_sgmcmc(jax.random.key(seed), d_w=3, d_theta=1, d_x0=1,
-                              log_likelihood_fn=loglik, energy_fn=energy,
-                              config=cfg)
-
-
-def test_driver_trace_log_posterior_is_the_true_log_posterior():
-    """The trace used to come from a separate log_posterior pass and now comes
-    off the kernel state; it must still be the log-posterior of the position
-    the chain actually holds."""
-    cfg = _config()
-    res = _run(cfg)
-    loglik, energy = _problem()
-
-    # Rebuilt from the driver's own pieces, so this checks the substitution
-    # rather than a re-derivation of the prior.
-    def log_posterior(z):
-        w, theta, x0 = ift_sde._split_z(z, 3, 1)
-        return (loglik(w, theta, x0) - energy(w, theta, x0)
-                + ift_sde._normal_logpdf(theta, jnp.asarray(cfg.theta_prior_std))
-                + ift_sde._normal_logpdf(x0, jnp.asarray(cfg.x0_prior_std)))
-
-    final_z = np.asarray(res.final_state["z"])
-    recorded = np.asarray(res.history["log_posterior"][-1])
-    expected = np.asarray([float(log_posterior(jnp.asarray(z))) for z in final_z])
-    np.testing.assert_allclose(recorded, expected, rtol=1e-12)
-
-
-def test_driver_final_state_is_the_final_position():
-    """Regression: threading a state through the scan makes it easy to leave
-    `final_state` pointing at the *initial* positions instead."""
-    short = _run(_config(iterations=50, thinning=50))
-    long = _run(_config(iterations=400, thinning=50))
-    assert not np.allclose(
-        np.asarray(short.final_state["z"]), np.asarray(long.final_state["z"])
-    )
-
-
-def test_driver_still_refuses_a_drifting_energy():
-    """Caching the energy is only sound because the energy cannot drift; the
-    guard that enforces that must stay."""
-    loglik, energy = _problem()
-    with pytest.raises(ValueError, match="true energy"):
-        ift_sde.run_sgmcmc(jax.random.key(0), d_w=3, d_theta=1, d_x0=1,
-                           log_likelihood_fn=loglik, energy_fn=energy,
-                           config=_config(), correction=object())

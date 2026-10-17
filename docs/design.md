@@ -6,17 +6,21 @@
 [sgmcmcjax](https://github.com/jeremiecoullon/SGMCMCJax) already exist and are
 good. samplax differs deliberately:
 
-1. **Provenance over coverage.** Every kernel traces to a verified port of the
-   paper authors' own code — SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax,
-   amagold-jax — each of which was compared quantitatively against the
-   original implementation (matlab/Octave, numpy, C++, PyTorch) before its
-   originals were retired. The vendored copies here are bit-equivalence-tested
-   against those ports (`tests/test_vendored_equivalence.py`). A sampler
-   whose lineage we can't verify doesn't go in.
+1. **Provenance over coverage.** **Vendored** kernels (SGLD, SGHMC, cyclical schedules,
+   AMAGOLD, low-precision SGLD, the HMC reference) are taken from JAX ports of the paper
+   authors' code (SGHMC-jax, csgmcmc-jax, low-precision-sgld-jax, amagold-jax) that were
+   compared quantitatively against the original implementations (matlab/Octave, numpy,
+   C++, PyTorch), and are equivalence-tested against those ports
+   (`tests/test_vendored_equivalence.py`). pSGLD preconditioning and the Gibbs
+   hyperpriors are vendored constructions without a equivalence test: pSGLD follows
+   Li et al.'s RMSprop construction and is checked on a Gaussian target; the Gibbs
+   hyperpriors come from SGHMC-jax and are checked for shape and scale. **Original**
+   kernels (currently pCN-within-Gibbs) are implemented here from the paper and verified
+   by exactness tests against closed-form targets.
 2. **Not a framework.** No data loaders, potential modules, solver aliases,
    or I/O collectors. You bring gradients (or log-density callbacks) and a
    pytree. Kernels never own the training loop, so they embed in outer loops
-   — the requirement that drove the design (see the ift-sde integration).
+   — the requirement that drove the design.
 3. **Cross-cut composition axes.** Schedules (constant / polynomial /
    cyclical), preconditioners (identity / RMSprop-pSGLD), precision
    (quantizers + variance-corrected quantization), and M-H correction
@@ -63,11 +67,7 @@ good. samplax differs deliberately:
 
 ## Roadmap
 
-- **Before 1.0.0:** move `samplax.integrations` out of the package. It is
-  internal glue for one downstream codebase and owns a sampling loop, which
-  principle 2 says the library does not do.
 - Fisher preconditioners (diag/dense) to match ift-sde's full preconditioner
   menu.
-- Validation of `run_sgmcmc` against ift-sde's `validate_mission.py` harness.
 - Candidates for curation: SGNHT, reSGLD — same rule: only via a verified
   port of the original code.

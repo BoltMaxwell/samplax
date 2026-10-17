@@ -8,7 +8,6 @@ import jax.numpy as jnp
 import numpy as np
 
 import samplax
-from samplax.integrations import ift_sde
 
 
 def _chain(kernel, grad_fn, n, step_size, seed=0, temperature=1.0, x0=0.0):
@@ -118,44 +117,6 @@ def test_gibbs_precision_shapes_and_scale():
     assert set(lams) == {"w", "b"}
     # posterior mean ~ (1 + n/2) / (1 + sum w^2 / 2) ~ 1/0.01 = 100 for w
     assert 60 < float(lams["w"]) < 140, lams
-
-
-def test_run_sgmcmc_family_b_seam():
-    """The ift-sde Family-B adapter recovers a conjugate Gaussian posterior."""
-    d_w, d_theta, d_x0 = 3, 2, 1
-    obs = jnp.asarray([0.5, -0.3, 0.8])
-
-    def log_likelihood_fn(w, theta, x0):
-        return -0.5 * jnp.sum((w - obs) ** 2) / 0.1**2 + 0.0 * jnp.sum(theta) + 0.0 * jnp.sum(x0)
-
-    def energy_fn(w, theta, x0):
-        return 0.5 * jnp.sum(w**2) + 0.5 * jnp.sum(theta**2) + 0.5 * jnp.sum(x0**2)
-
-    cfg = ift_sde.SGMCMCConfig(kernel="sghmc", iterations=4000, chains=2,
-                               burn_in=1000, thinning=5, step_size=1e-3)
-    res = ift_sde.run_sgmcmc(jax.random.key(0), d_w=d_w, d_theta=d_theta,
-                             d_x0=d_x0, log_likelihood_fn=log_likelihood_fn,
-                             energy_fn=energy_fn, config=cfg)
-    assert res.samples["z_samples"].shape[-1] == d_w + d_theta + d_x0
-    assert res.samples["w_samples"].shape[-1] == d_w
-    post_mean = res.samples["w_samples"].reshape(-1, d_w).mean(axis=0)
-    # posterior mean ~ obs / (1 + 0.01) for likelihood prec 100, prior prec 1
-    np.testing.assert_allclose(post_mean, np.asarray(obs) / 1.01, atol=0.05)
-    assert len(res.history["step"]) >= 1
-
-
-def test_make_field_sampler_boundary():
-    """Nesting-I seam: f(field_state, param_state, key) -> chain."""
-    inner = ift_sde.make_field_sampler(
-        samplax.sgld(), samplax.constant(0.01), num_steps=2000,
-        keep_every=10, burn=100)
-
-    def grad_fn(field, param_state, key):
-        return jax.tree_util.tree_map(lambda x: -(x - param_state), field)
-
-    chain = inner(grad_fn, {"w": jnp.zeros(3)}, jnp.asarray(2.0), jax.random.key(0))
-    assert chain["w"].shape == (190, 3)
-    np.testing.assert_allclose(chain["w"][50:].mean(), 2.0, atol=0.2)
 
 
 if __name__ == "__main__":

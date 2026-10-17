@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] — 2026-10-16
+
+### Removed
+
+- **`samplax.integrations`** — removed, including `run_sgmcmc`, `SGMCMCConfig`,
+  `Correction` and the `nested` module. The adapter now lives outside this
+  library as `ift.samplers.samplax_adapter` in ift-sde, which is private. Replace
+  `from samplax.integrations.ift_sde import …` with
+  `from ift.samplers.samplax_adapter import …`.
+
+### Added
+
+- **`samplax.pcn_gibbs`** exported from the top level and listed in the API reference.
+- **`AGENTS.md`** (with a `CLAUDE.md` pointer) and **`CITATION.cff`**.
+- **CI**: a GitHub Actions workflow runs the test suite (excluding the
+  vendored-equivalence file, which needs the source repos) on Python 3.11 and 3.12.
+- **`tests/test_readme_examples.py`** executes every README code block.
+
+### Changed
+
+- **README** rewritten around runnable examples.
+- **Provenance statement** distinguishes vendored kernels (equivalence-tested
+  against verified ports) from original kernels (pCN-within-Gibbs,
+  exactness-tested against closed-form targets).
+- **Error messages**: every `ValueError` names the valid inputs.
+- **`lp_sgld`** validates `variant` when the kernel is built, not inside `step`.
+- **Docs** take their version from `samplax.__version__` and build warning-free.
+- **`tests/test_vendored_equivalence.py`** reports missing source repos as skipped
+  instead of passing silently.
+  It also enables float64 itself, so a standalone run matches the full suite
+  (in float32 the AMAGOLD comparison fails by one ulp).
+
+### Not in this release
+
+- License: Apache-2.0 follows in 0.9.0 once the upstream authors have been notified.
+
 ## [0.7.0] — 2026-10-04
 
 ### Added
@@ -102,8 +138,8 @@ All notable changes to this project will be documented in this file.
   acceptance, giving d_w-robust mixing with no leapfrog stability ceiling —
   then `pcn_n_mh` Gaussian random-walk M-H updates of (theta, x0) | w with
   per-coordinate `pcn_mh_scales`. Both moves are exact conditional M-H, so the
-  sweep is pi-invariant for any tuning. Motivated by the ift-sde v5/v9
-  finding that joint-trajectory kernels fail on these targets through the
+  sweep is pi-invariant for any tuning. Motivated by the finding that
+  joint-trajectory kernels fail on these targets through the
   theta-w trajectory-coupling mechanism; blocking removes the requirement.
 - **Whitened-energy probe**: the pcn-gibbs driver verifies at setup that
   `energy_fn == ||w||^2/2 + const` (three-point probe) and raises otherwise;
@@ -126,7 +162,7 @@ All notable changes to this project will be documented in this file.
   `amagold_dt_theta` / `amagold_dt_x0` (per-block steps expanded over the
   [w | theta | x0] layout) and `amagold_dt_friction`. Motivated by the
   whitened-Duffing failure where one scalar dt froze the theta block
-  (ift-sde sampler_experimentation v5).
+  (private experiments).
 - **5 new tests** (53 total): equal-entry-vector ≡ scalar, anisotropic-Gaussian
   exactness + decorrelation contrast, per-block integration path, loud
   preconditioner raise, thermostat-noise regression.

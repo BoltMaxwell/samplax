@@ -1,6 +1,15 @@
+import os
+import sys
+
+# Resolve the package from this checkout, not whatever tree an editable
+# install points at, so the docs describe (and version) the code beside them.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from samplax import __version__  # noqa: E402
+
 project = "samplax"
 author = "Maxwell Bolt"
-release = "0.1.0"
+release = version = __version__
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -17,5 +26,4 @@ html_title = "samplax"
 
 myst_enable_extensions = ["dollarmath"]
 
-# ift_sde.md documents samplax.integrations, which is internal (see README)
-exclude_patterns = ["_build", "ift_sde.md"]
+exclude_patterns = ["_build"]

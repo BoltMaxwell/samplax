@@ -57,6 +57,9 @@ def lp_sgld(variant, wl, fl, *, datasize, weight_decay=0.0, number="fixed"):
     ``step(key, state, grad, lr, temperature=1.0)`` with ``grad`` the descent
     mean-loss gradient (see module docstring).
     """
+    if variant not in ("naive", "sgldlp_f", "vc"):
+        raise ValueError(
+            f"unknown variant {variant!r}; expected one of 'naive', 'sgldlp_f', 'vc'")
     if number == "fixed":
         def quant(x, k):
             return fixed_point_quantize(x, wl, fl, "stochastic", k)
@@ -70,7 +73,8 @@ def lp_sgld(variant, wl, fl, *, datasize, weight_decay=0.0, number="fixed"):
         def vc_quant(k, x, var):
             return Q_vc_block(k, x, var, wl)
     else:
-        raise ValueError(f"unknown number format {number!r}")
+        raise ValueError(
+            f"unknown number format {number!r}; expected one of 'fixed', 'block'")
 
     def init(key, position):
         if variant in ("naive", "vc"):
@@ -97,10 +101,9 @@ def lp_sgld(variant, wl, fl, *, datasize, weight_decay=0.0, number="fixed"):
             stepped = jax.tree_util.tree_map(lambda p, n: p + n, stepped, gn)
             out = stepped if variant == "sgldlp_f" else _tree_map_keyed(quant, stepped, kw)
             return LPSGLDState(out)
-        if variant == "vc":
-            mu = jax.tree_util.tree_map(gd, params, qgrads)
-            return LPSGLDState(
-                _tree_map_keyed(lambda x, k: vc_quant(k, x, var), mu, kw))
-        raise ValueError(f"unknown variant {variant!r}")
+        # variant validated at build time; "vc" is the only remaining case
+        mu = jax.tree_util.tree_map(gd, params, qgrads)
+        return LPSGLDState(
+            _tree_map_keyed(lambda x, k: vc_quant(k, x, var), mu, kw))
 
     return LPKernel(init, step, forward_quant)

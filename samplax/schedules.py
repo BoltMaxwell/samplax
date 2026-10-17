@@ -44,11 +44,11 @@ def exponential(step_size, step_size_final, num_training_steps):
     Both step sizes must be positive; num_training_steps >= 1.
     """
     if step_size <= 0.0:
-        raise ValueError(f"step_size must be positive, got {step_size}")
+        raise ValueError(f"step_size must be > 0 (got {step_size})")
     if step_size_final <= 0.0:
-        raise ValueError(f"step_size_final must be positive, got {step_size_final}")
+        raise ValueError(f"step_size_final must be > 0 (got {step_size_final})")
     if num_training_steps < 1:
-        raise ValueError(f"num_training_steps must be >= 1, got {num_training_steps}")
+        raise ValueError(f"num_training_steps must be >= 1 (got {num_training_steps})")
 
     def schedule_fn(step_id):
         if num_training_steps <= 1:
