@@ -9,6 +9,7 @@ from samplax import __version__  # noqa: E402
 
 project = "samplax"
 author = "Maxwell Bolt"
+copyright = "2026, Maxwell Bolt. Apache License 2.0"
 release = version = __version__
 
 extensions = [

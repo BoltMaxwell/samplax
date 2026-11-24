@@ -4,6 +4,8 @@
 
 `samplax` is a pure-JAX library of stochastic-gradient MCMC kernels (SGLD, SGHMC, HMC, AMAGOLD, pCN-Gibbs, low-precision SGLD) with schedules and preconditioners. It ships kernels only; you own the sampling loop.
 
+Licensed Apache-2.0 (`LICENSE`, `NOTICE`). Every vendored kernel's upstream repository and paper are listed in `NOTICE` and `CITATION.cff`; when a kernel is added or re-sourced, those two files change with it.
+
 ## Install
 
 `pip install git+https://github.com/BoltMaxwell/samplax`, or `pip install -e '.[dev]'` from a checkout.
